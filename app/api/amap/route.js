@@ -13,6 +13,13 @@ function isInsideTargetBuilding(poi) {
   return /融科(?:资讯|咨询|天地|中心)/.test(text) || /科学院?南路[2二]号/.test(text);
 }
 
+function pageLimitForRadius(radius) {
+  if (radius <= 1000) return 1;
+  if (radius <= 2000) return 2;
+  if (radius <= 5000) return 3;
+  return 4;
+}
+
 async function amapRequest(path, params) {
   const key = process.env.AMAP_WEB_SERVICE_KEY;
   if (!key) return { error: '高德 Web 服务 Key 尚未配置', status: 503 };
@@ -59,21 +66,28 @@ export async function GET(request) {
       return errorResponse('缺少有效的中心坐标');
     }
     const radius = Math.min(10000, Math.max(100, Number(params.get('radius')) || 1000));
-    const result = await amapRequest('/v3/place/around', {
-      location,
-      radius,
-      keywords: (params.get('keywords') || '').slice(0, 50),
-      types: (params.get('types') || '').slice(0, 80),
-      city: '110000',
-      city_limit: 'true',
-      sortrule: 'distance',
-      extensions: 'all',
-      offset: 20,
-      page: 1
-    });
-    if (result.error) return errorResponse(result.error, result.status);
+    const offset = 25;
+    const rawPois = [];
+    for (let page = 1; page <= pageLimitForRadius(radius); page += 1) {
+      const result = await amapRequest('/v3/place/around', {
+        location,
+        radius,
+        keywords: (params.get('keywords') || '').slice(0, 50),
+        types: (params.get('types') || '').slice(0, 80),
+        city: '110000',
+        city_limit: 'true',
+        sortrule: 'distance',
+        extensions: 'all',
+        offset,
+        page
+      });
+      if (result.error) return errorResponse(result.error, result.status);
+      const pagePois = result.data.pois || [];
+      rawPois.push(...pagePois);
+      if (pagePois.length < offset) break;
+    }
 
-    const pois = (result.data.pois || []).map(poi => {
+    const pois = rawPois.map(poi => {
       const [lng, lat] = String(poi.location || '').split(',').map(Number);
       const rating = typeof poi.biz_ext?.rating === 'string' && poi.biz_ext.rating ? poi.biz_ext.rating : null;
       const cost = typeof poi.biz_ext?.cost === 'string' && poi.biz_ext.cost ? poi.biz_ext.cost : null;
@@ -91,7 +105,8 @@ export async function GET(request) {
       };
     })
       .filter(poi => poi.id && Number.isFinite(poi.lng) && Number.isFinite(poi.lat))
-      .filter(poi => !isInsideTargetBuilding(poi));
+      .filter(poi => !isInsideTargetBuilding(poi))
+      .filter((poi, index, items) => items.findIndex(item => item.id === poi.id) === index);
 
     return NextResponse.json({ ok: true, pois });
   }
