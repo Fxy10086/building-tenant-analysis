@@ -10,7 +10,7 @@ function errorResponse(message, status = 400) {
 function isInsideTargetBuilding(poi) {
   if (poi.distance > 250) return false;
   const text = `${poi.name}${poi.address}`;
-  return /融科(?:资讯|咨询|天地|中心)/.test(text) || /科学院?南路[2二]号/.test(text);
+  return /融科(?:资讯|咨询|天地|中心|大厦|店)/.test(text) || /科学院?南路[2二]号/.test(text);
 }
 
 function pageLimitForRadius(radius) {
