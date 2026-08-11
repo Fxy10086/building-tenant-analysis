@@ -311,6 +311,44 @@
     .weight-value { text-align: right; font-variant-numeric: tabular-nums; }
     .model-total { font-size: 28px; font-weight: 600; color: var(--brand); }
     .model-total.invalid { color: var(--red); }
+    .confidence {
+      display: grid;
+      grid-template-columns: 84px minmax(100px, 1fr) 48px;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      font-size: 12px;
+    }
+    .scenario-switch { display: flex; flex-wrap: wrap; gap: 6px; }
+    .scenario-switch .chip { min-width: 66px; }
+    .signal-list { display: grid; gap: 9px; }
+    .signal-row {
+      display: grid;
+      grid-template-columns: minmax(100px, 1fr) 90px 60px;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+    }
+    .signal-row:last-child { border-bottom: 0; }
+    .signal-row strong { text-align: right; font-weight: 600; }
+    .unit-code { font-weight: 600; color: var(--brand); }
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .pipeline-step {
+      min-height: 72px;
+      padding: 11px;
+      background: var(--surface-soft);
+      border-top: 3px solid var(--line);
+    }
+    .pipeline-step.active { border-top-color: var(--brand); }
+    .pipeline-step.warn { border-top-color: var(--orange); }
+    .pipeline-step strong { display: block; font-size: 19px; margin-top: 5px; }
+    .pipeline-step span { color: var(--muted); font-size: 12px; }
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -369,6 +407,7 @@
       .overlay { position: fixed; inset: 0; z-index: 25; background: rgba(13, 24, 28, .28); }
       .overlay.open { display: block; }
       .grid.two, .grid.three { grid-template-columns: 1fr; }
+      .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .main { padding: 18px; }
       .topbar { padding: 0 16px; }
     }
@@ -387,6 +426,9 @@
       .score-ring { width: 66px; }
       .bar-row { grid-template-columns: 74px minmax(60px, 1fr) 34px; gap: 7px; }
       .weight-row { grid-template-columns: 90px minmax(90px, 1fr) 46px; gap: 8px; }
+      .confidence { grid-template-columns: 74px minmax(70px, 1fr) 40px; }
+      .signal-row { grid-template-columns: 1fr 70px 48px; gap: 7px; }
+      .pipeline { grid-template-columns: 1fr 1fr; }
       .mapping-row { grid-template-columns: 1fr; }
       .mapping-row .icon { display: none; }
       .modal-backdrop { padding: 66px 10px 10px; }
@@ -403,14 +445,17 @@
       <nav class="nav" aria-label="主导航">
         <div class="nav-label">工作台</div>
         <a class="nav-link" data-route="analysis" href="#analysis"><i data-lucide="scan-search" class="icon" aria-hidden="true"></i>招商分析</a>
+        <a class="nav-link" data-route="compare" href="#compare"><i data-lucide="columns-3" class="icon" aria-hidden="true"></i>候选对比</a>
         <a class="nav-link" data-route="merchants" href="#merchants"><i data-lucide="store" class="icon" aria-hidden="true"></i>楼内商户</a>
+        <a class="nav-link" data-route="units" href="#units"><i data-lucide="map-pinned" class="icon" aria-hidden="true"></i>可招商铺位</a>
         <a class="nav-link" data-route="audience" href="#audience"><i data-lucide="users" class="icon" aria-hidden="true"></i>客群画像</a>
         <a class="nav-link" data-route="operations" href="#operations"><i data-lucide="chart-no-axes-combined" class="icon" aria-hidden="true"></i>经营数据</a>
         <div class="nav-label" style="margin-top:20px">管理</div>
+        <a class="nav-link" data-route="decisions" href="#decisions"><i data-lucide="clipboard-check" class="icon" aria-hidden="true"></i>决策记录</a>
         <a class="nav-link" data-route="import" href="#import"><i data-lucide="database" class="icon" aria-hidden="true"></i>数据导入</a>
         <a class="nav-link" data-route="model" href="#model"><i data-lucide="sliders-horizontal" class="icon" aria-hidden="true"></i>评分模型</a>
       </nav>
-      <div class="sidebar-foot">模拟数据环境 · 25 家商户</div>
+      <div class="sidebar-foot">决策沙盒 · 模拟数据环境</div>
     </aside>
     <div class="overlay" id="overlay"></div>
 
@@ -476,12 +521,35 @@
       gym: {name:'超级猩猩',category:'运动健身',group:'健身',price:'89 元/次',area:'280 ㎡',rent:'15 万元',score:88,verdict:'优先引入',risk:'关注晚间客流',summary:'按次付费模式与楼内年轻白领高度匹配，可补充现有会籍制健身房。',bars:[['客群匹配',94],['业态互补',96],['消费时段',87],['租金承受',76],['竞争强度',92]],table:[['单次消费','89 元','118 元','-24.6%','positive'],['月活用户','1,180 人','1,120 人','+5.4%','positive'],['晚间消费占比','64%','51%','+13.0pt','positive'],['预估坪效','1,860 元','1,720 元','+8.1%','positive']],opportunity:'按次付费模式与楼内 3 家会籍制健身房形成明显互补。',riskText:'周末楼宇客流偏低，需核验品牌周末独立获客能力。'}
     };
 
+    const businessCases = {
+      coffee: {revenue:{low:31,base:38,high:45},grossMargin:68,fixedCost:15.6,rent:7.5,capex:68,breakeven:34.0,payback:18,rentBand:'6.8–8.2 万',confidence:78,range:'76–86',completeness:86,cannibalization:12,nearbyCompetitors:8,unit:'1F-07'},
+      food: {revenue:{low:72,base:86,high:102},grossMargin:64,fixedCost:42.5,rent:11,capex:125,breakeven:83.6,payback:24,rentBand:'9.5–11.5 万',confidence:72,range:'68–80',completeness:81,cannibalization:18,nearbyCompetitors:21,unit:'B1-08'},
+      gym: {revenue:{low:50,base:62,high:76},grossMargin:75,fixedCost:28.8,rent:15,capex:180,breakeven:58.4,payback:25,rentBand:'13.5–16.0 万',confidence:81,range:'84–92',completeness:89,cannibalization:6,nearbyCompetitors:5,unit:'4F-02'}
+    };
+
+    const vacantUnits = [
+      {code:'1F-07',floor:'1F',area:72,rent:6.5,power:80,water:'有',exhaust:'无',gas:'无',hours:'07:00–23:00',delivery:'2026-09-01',fit:{coffee:94,food:52,gym:28}},
+      {code:'1F-12',floor:'1F',area:96,rent:8.1,power:100,water:'有',exhaust:'无',gas:'无',hours:'07:00–23:00',delivery:'2026-10-15',fit:{coffee:89,food:61,gym:35}},
+      {code:'B1-08',floor:'B1',area:168,rent:10.5,power:140,water:'有',exhaust:'有',gas:'有',hours:'06:00–24:00',delivery:'2026-09-20',fit:{coffee:70,food:92,gym:36}},
+      {code:'2F-12',floor:'2F',area:230,rent:12.4,power:120,water:'有',exhaust:'预留',gas:'无',hours:'08:00–22:00',delivery:'2026-11-01',fit:{coffee:58,food:76,gym:72}},
+      {code:'3F-06',floor:'3F',area:380,rent:19.5,power:220,water:'有',exhaust:'有',gas:'有',hours:'10:00–24:00',delivery:'2026-12-01',fit:{coffee:32,food:84,gym:64}},
+      {code:'4F-02',floor:'4F',area:300,rent:14.8,power:160,water:'有',exhaust:'无',gas:'无',hours:'06:00–23:00',delivery:'2026-09-10',fit:{coffee:35,food:42,gym:96}}
+    ];
+
+    const decisionRecords = [
+      {merchant:'超级猩猩',score:88,stage:'尽调中',owner:'陈敏',unit:'4F-02',next:'核验消防与承重报告',due:'2026-08-15',status:'进行中'},
+      {merchant:'M Stand 咖啡',score:82,stage:'商务谈判',owner:'李哲',unit:'1F-07',next:'确认租金 7.5 万方案',due:'2026-08-14',status:'待决策'},
+      {merchant:'和府捞面',score:74,stage:'条件复核',owner:'王倩',unit:'B1-08',next:'补充高峰期翻台数据',due:'2026-08-18',status:'待补充'},
+      {merchant:'无印良品续租',score:79,stage:'审批中',owner:'陈敏',unit:'2F-01',next:'资产负责人审批',due:'2026-08-13',status:'待审批'}
+    ];
+
     const appState = {
       candidate: 'coffee',
       merchantSearch: '',
       merchantGroup: '全部',
       merchantFloor: '全部',
       operationPeriod: '本月',
+      scenario: 'base',
       history: [
         {name:'超级猩猩',score:88,result:'优先引入',time:'今天 10:32'},
         {name:'M Stand 咖啡',score:82,result:'建议引入',time:'昨天 16:18'},
@@ -492,9 +560,12 @@
 
     const pageMeta = {
       analysis:['新商户适配分析','评估候选商户与楼宇客群、业态结构及经营目标的匹配程度'],
+      compare:['候选商户对比','从收益、风险、可信度和铺位适配度选择更优品牌'],
       merchants:['楼内商户','管理 25 家在营商户并查看楼宇业态结构'],
+      units:['可招商铺位','根据面积、租金和工程条件匹配候选商户'],
       audience:['客群画像','基于楼宇企业、员工与消费时段数据形成招商客群基准'],
       operations:['经营数据','跟踪商户营收、坪效、租金和楼宇商业活跃度'],
+      decisions:['决策记录','管理候选品牌从分析、尽调、谈判到审批的完整过程'],
       import:['数据导入','导入商户经营数据并映射到统一分析字段'],
       model:['评分模型','配置招商适配度计算权重和决策阈值']
     };
@@ -511,9 +582,22 @@
     function groupClass(group) { return group === '饮品' ? 'drink' : group === '健身' ? 'gym' : group === '百货' ? 'retail' : ''; }
     function money(value) { return Number(value).toLocaleString('zh-CN',{minimumFractionDigits: value % 1 ? 1 : 0,maximumFractionDigits:1}); }
     function groupCount(group) { return merchants.filter(item => item.group === group).length; }
+    function caseMetrics(key) {
+      const item=businessCases[key];
+      const revenue=item.revenue[appState.scenario];
+      const grossProfit=revenue*item.grossMargin/100;
+      const operatingProfit=grossProfit-item.fixedCost-item.rent;
+      const payback=Math.max(12,Math.round(item.payback*item.revenue.base/revenue));
+      return {revenue,grossProfit,operatingProfit,payback,rentSales:item.rent/revenue*100};
+    }
+    function rankedUnits(key) { return [...vacantUnits].sort((a,b)=>b.fit[key]-a.fit[key]); }
+    function confidenceLabel(value) { return value>=80?'高':value>=70?'中等':'偏低'; }
 
     function renderAnalysis() {
       const p = candidates[appState.candidate];
+      const bc = businessCases[appState.candidate];
+      const fm = caseMetrics(appState.candidate);
+      const topUnits = rankedUnits(appState.candidate).slice(0,3);
       return `${pageHeader('analysis',`<button class="btn" data-open-history>${icon('history')}分析历史</button>`)}
         <div class="grid analysis">
           <div class="grid">
@@ -536,12 +620,55 @@
             </section>
           </div>
           <section class="panel">
-            <div class="result-head"><div class="score-wrap"><div class="score-ring" style="--score:${p.score}"><span>${p.score}</span></div><div><h2><span id="result-name">${p.name}</span> · 招商建议</h2><div class="badge-row"><span class="badge">${icon('circle-check')}${p.verdict}</span><span class="badge warn">${p.risk}</span></div><p class="summary">${p.summary}</p></div></div><span class="panel-note">模型已计算</span></div>
+            <div class="result-head"><div class="score-wrap"><div class="score-ring" style="--score:${p.score}"><span>${p.score}</span></div><div><h2><span id="result-name">${p.name}</span> · 招商建议</h2><div class="badge-row"><span class="badge">${icon('circle-check')}${p.verdict}</span><span class="badge warn">${p.risk}</span><span class="badge blue">可信度${confidenceLabel(bc.confidence)}</span></div><p class="summary">${p.summary}</p></div></div><span class="panel-note">得分区间 ${bc.range}</span></div>
             <div class="section"><div class="section-title"><h3>适配度构成</h3><span class="panel-note">总分 ${p.score}</span></div><div class="bars">${p.bars.map(row=>`<div class="bar-row ${row[2]?'warn':''}"><span>${row[0]}</span><div class="track"><div class="fill" style="--value:${row[1]}"></div></div><span class="bar-value">${row[1]}</span></div>`).join('')}</div></div>
             <div class="section"><div class="section-title"><h3>与楼内同业对比</h3><span class="panel-note">楼内${p.group} ${groupCount(p.group)} 家</span></div><div class="table-wrap"><table><thead><tr><th>指标</th><th class="num">候选商户</th><th class="num">楼内同业均值</th><th class="num">差异</th></tr></thead><tbody>${p.table.map(row=>`<tr><td>${row[0]}</td><td class="num">${row[1]}</td><td class="num">${row[2]}</td><td class="num ${row[4]}">${row[3]}</td></tr>`).join('')}</tbody></table></div></div>
             <div class="section"><div class="section-title"><h3>决策依据</h3></div><div class="decision-grid"><div class="decision"><h3>主要机会</h3><p>${p.opportunity}</p></div><div class="decision risk"><h3>主要风险</h3><p>${p.riskText}</p></div></div></div>
           </section>
+        </div>
+        <div class="grid two" style="margin-top:16px">
+          <section class="panel">
+            <div class="panel-head"><div><h2>招商财务测算</h2><p class="page-subtitle">单位：万元/月，模拟口径</p></div><div class="scenario-switch"><button class="chip ${appState.scenario==='low'?'active':''}" data-scenario="low">保守</button><button class="chip ${appState.scenario==='base'?'active':''}" data-scenario="base">基准</button><button class="chip ${appState.scenario==='high'?'active':''}" data-scenario="high">乐观</button></div></div>
+            <div class="grid four"><div><span class="metric-label">预计营收</span><div class="metric-value">${money(fm.revenue)}</div><div class="metric-note">区间 ${bc.revenue.low}–${bc.revenue.high}</div></div><div><span class="metric-label">租售比</span><div class="metric-value">${fm.rentSales.toFixed(1)}%</div><div class="metric-note ${fm.rentSales>15?'warn':'up'}">${fm.rentSales>15?'高于建议水平':'处于可接受范围'}</div></div><div><span class="metric-label">经营利润</span><div class="metric-value">${money(fm.operatingProfit)}</div><div class="metric-note">毛利率 ${bc.grossMargin}%</div></div><div><span class="metric-label">回收期</span><div class="metric-value">${fm.payback} 月</div><div class="metric-note">装修投入 ${bc.capex} 万</div></div></div>
+            <div class="section"><div class="table-wrap"><table><tbody><tr><td>盈亏平衡营收</td><td class="num">${bc.breakeven} 万/月</td></tr><tr><td>建议租金区间</td><td class="num">${bc.rentBand}</td></tr><tr><td>基准月租金</td><td class="num">${bc.rent} 万/月</td></tr><tr><td>建议合同结构</td><td class="num">保底租金 + 超额营业额提成</td></tr></tbody></table></div></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>可信度与铺位建议</h2><span class="panel-note">模拟数据校验</span></div>
+            <div class="confidence"><span>模型可信度</span><div class="track"><div class="fill" style="--value:${bc.confidence}"></div></div><strong>${bc.confidence}%</strong></div>
+            <div class="confidence"><span>数据完整度</span><div class="track"><div class="fill" style="--value:${bc.completeness};background:var(--blue)"></div></div><strong>${bc.completeness}%</strong></div>
+            <div class="section"><div class="section-title"><h3>推荐铺位</h3><a href="#units" class="panel-note">查看全部铺位</a></div><div class="signal-list">${topUnits.map((unit,index)=>`<div class="signal-row"><span><span class="unit-code">${unit.code}</span> · ${unit.floor} · ${unit.area}㎡</span><span>${unit.rent} 万/月</span><strong>${unit.fit[appState.candidate]} 分</strong></div>`).join('')}</div></div>
+            <div class="section"><div class="section-title"><h3>竞争影响</h3></div><div class="decision-grid"><div class="decision risk"><h3>预计分流</h3><p>对楼内同业营业额影响约 ${bc.cannibalization}%，需纳入续租评估。</p></div><div class="decision"><h3>周边竞争</h3><p>500 米内同类品牌 ${bc.nearbyCompetitors} 家，建议核验价格带与时段重叠。</p></div></div></div>
+          </section>
         </div>`;
+    }
+
+    function renderCompare() {
+      const rows=Object.entries(candidates).map(([key,p])=>{
+        const bc=businessCases[key];
+        const revenue=bc.revenue.base;
+        const profit=revenue*bc.grossMargin/100-bc.fixedCost-bc.rent;
+        return {key,p,bc,revenue,profit,rentSales:bc.rent/revenue*100,unit:rankedUnits(key)[0]};
+      });
+      return `${pageHeader('compare',`<button class="btn" data-toast="候选对比报告已生成">${icon('file-down')}生成对比报告</button>`)}
+        <div class="grid three" style="margin-bottom:16px"><div class="metric-card"><div class="metric-label">综合得分最高</div><div class="metric-value">超级猩猩 · 88</div><div class="metric-note up">业态互补与客群匹配突出</div></div><div class="metric-card"><div class="metric-label">预计营收最高</div><div class="metric-value">和府捞面 · 86 万</div><div class="metric-note warn">同时存在较高竞争分流</div></div><div class="metric-card"><div class="metric-label">风险收益最优</div><div class="metric-value">超级猩猩</div><div class="metric-note up">预计同业分流仅 6%</div></div></div>
+        <section class="panel"><div class="panel-head"><h2>候选商户横向比较</h2><span class="panel-note">基准情景</span></div><div class="table-wrap"><table style="min-width:980px"><thead><tr><th>候选商户</th><th>业态</th><th class="num">综合得分</th><th class="num">可信度</th><th class="num">预计月营收</th><th class="num">经营利润</th><th class="num">租售比</th><th class="num">回收期</th><th>推荐铺位</th><th>建议</th></tr></thead><tbody>${rows.map(row=>`<tr><td><strong>${row.p.name}</strong></td><td>${row.p.category}</td><td class="num">${row.p.score}</td><td class="num">${row.bc.confidence}%</td><td class="num">${row.revenue} 万</td><td class="num ${row.profit>0?'positive':'negative'}">${money(row.profit)} 万</td><td class="num">${row.rentSales.toFixed(1)}%</td><td class="num">${row.bc.payback} 月</td><td><span class="unit-code">${row.unit.code}</span> · ${row.unit.fit[row.key]}分</td><td><span class="badge ${row.p.verdict==='条件引入'?'warn':''}">${row.p.verdict}</span></td></tr>`).join('')}</tbody></table></div></section>
+        <div class="grid three" style="margin-top:16px">${rows.map(row=>`<section class="panel"><div class="panel-head"><h2>${row.p.name}</h2><span class="badge blue">区间 ${row.bc.range}</span></div><div class="decision"><h3>核心优势</h3><p>${row.p.opportunity}</p></div><div class="decision risk" style="margin-top:10px"><h3>主要约束</h3><p>${row.p.riskText}</p></div><div class="section"><a href="#analysis" class="btn" data-compare-candidate="${row.key}">${icon('scan-search')}进入详细测算</a></div></section>`).join('')}</div>`;
+    }
+
+    function renderUnits() {
+      const totalArea=vacantUnits.reduce((sum,item)=>sum+item.area,0);
+      const totalRent=vacantUnits.reduce((sum,item)=>sum+item.rent,0);
+      return `${pageHeader('units',`<button class="btn" data-toast="铺位匹配报告已导出">${icon('download')}导出铺位表</button>`)}
+        <div class="grid four" style="margin-bottom:16px"><div class="metric-card"><div class="metric-label">可招商铺位</div><div class="metric-value">${vacantUnits.length} 个</div><div class="metric-note">覆盖 B1–4F</div></div><div class="metric-card"><div class="metric-label">可招商面积</div><div class="metric-value">${money(totalArea)} ㎡</div><div class="metric-note">平均 ${Math.round(totalArea/vacantUnits.length)} ㎡</div></div><div class="metric-card"><div class="metric-label">潜在月租</div><div class="metric-value">${money(totalRent)} 万</div><div class="metric-note up">满租情景</div></div><div class="metric-card"><div class="metric-label">60 天内交付</div><div class="metric-value">3 个</div><div class="metric-note warn">需优先完成招商</div></div></div>
+        <section class="panel"><div class="panel-head"><h2>铺位条件与商户匹配</h2><span class="panel-note">工程条件已纳入适配分</span></div><div class="table-wrap"><table style="min-width:1040px"><thead><tr><th>铺位</th><th>楼层</th><th class="num">面积</th><th class="num">月租</th><th class="num">电量</th><th>给排水</th><th>排烟</th><th>燃气</th><th>营业时段</th><th>交付日</th><th>最佳候选</th></tr></thead><tbody>${vacantUnits.map(unit=>{const best=Object.entries(unit.fit).sort((a,b)=>b[1]-a[1])[0];return `<tr><td><span class="unit-code">${unit.code}</span></td><td>${unit.floor}</td><td class="num">${unit.area} ㎡</td><td class="num">${unit.rent} 万</td><td class="num">${unit.power} kW</td><td>${unit.water}</td><td>${unit.exhaust}</td><td>${unit.gas}</td><td>${unit.hours}</td><td>${unit.delivery}</td><td>${candidates[best[0]].name} · <strong>${best[1]}分</strong></td></tr>`}).join('')}</tbody></table></div></section>
+        <div class="grid two" style="margin-top:16px"><section class="panel"><div class="panel-head"><h2>工程条件风险</h2><span class="badge warn">2 项需处理</span></div><div class="signal-list"><div class="signal-row"><span>B1-08 排烟改造</span><span>预计 18 万</span><strong>中风险</strong></div><div class="signal-row"><span>4F-02 消防复核</span><span>预计 12 天</span><strong>中风险</strong></div><div class="signal-row"><span>1F-07 门头审批</span><span>预计 7 天</span><strong>低风险</strong></div></div></section><section class="panel"><div class="panel-head"><h2>铺位组合建议</h2><span class="panel-note">降低空置机会成本</span></div><div class="decision"><h3>优先签约</h3><p>4F-02 与超级猩猩匹配度 96 分，预计可补充晚间客流，应优先推进消防复核。</p></div><div class="decision risk" style="margin-top:10px"><h3>租金策略</h3><p>1F-07 建议采用 6.8 万保底租金加超额提成，控制饮品同业分流风险。</p></div></section></div>`;
+    }
+
+    function renderDecisions() {
+      return `${pageHeader('decisions',`<button class="btn primary" data-toast="新的决策事项已创建">${icon('plus')}新建决策</button>`)}
+        <div class="pipeline" style="margin-bottom:16px"><div class="pipeline-step active"><span>初步分析</span><strong>3</strong></div><div class="pipeline-step active"><span>尽调与复核</span><strong>2</strong></div><div class="pipeline-step warn"><span>商务谈判</span><strong>1</strong></div><div class="pipeline-step"><span>内部审批</span><strong>1</strong></div><div class="pipeline-step"><span>已签约</span><strong>0</strong></div></div>
+        <section class="panel"><div class="panel-head"><h2>在途决策事项</h2><span class="panel-note">按截止日期排序</span></div><div class="table-wrap"><table style="min-width:920px"><thead><tr><th>候选商户</th><th class="num">评分</th><th>阶段</th><th>负责人</th><th>目标铺位</th><th>下一步</th><th>截止日期</th><th>状态</th><th>操作</th></tr></thead><tbody>${decisionRecords.map((item,index)=>`<tr><td><strong>${item.merchant}</strong></td><td class="num">${item.score}</td><td>${item.stage}</td><td>${item.owner}</td><td><span class="unit-code">${item.unit}</span></td><td>${item.next}</td><td>${item.due}</td><td><span class="badge ${item.status==='进行中'?'':item.status==='待审批'?'blue':'warn'}">${item.status}</span></td><td><button class="btn" data-decision-action="${index}">更新</button></td></tr>`).join('')}</tbody></table></div></section>
+        <div class="grid two" style="margin-top:16px"><section class="panel"><div class="panel-head"><h2>审批与审计</h2><span class="badge">规则已启用</span></div><div class="signal-list"><div class="signal-row"><span>评分低于 75 分</span><span>资产负责人</span><strong>需审批</strong></div><div class="signal-row"><span>租售比高于 15%</span><span>财务负责人</span><strong>需审批</strong></div><div class="signal-row"><span>装修补贴超 80 万</span><span>总经理</span><strong>需审批</strong></div></div></section><section class="panel"><div class="panel-head"><h2>最近决策记录</h2><span class="panel-note">保留完整变更轨迹</span></div><div class="history-item"><h3>M Stand 咖啡租金方案调整</h3><p>李哲将保底租金从 8.0 万调整为 7.5 万 · 今天 11:20</p></div><div class="history-item"><h3>超级猩猩进入尽调</h3><p>陈敏上传消防与承重资料清单 · 今天 09:35</p></div></section></div>`;
     }
 
     function filteredMerchants() {
@@ -592,13 +719,14 @@
       return `${pageHeader('model',`<button class="btn" id="reset-model">${icon('rotate-ccw')}恢复默认</button><button class="btn primary" id="save-model" ${total!==100?'disabled':''}>${icon('save')}保存模型</button>`)}
         <div class="grid two"><section class="panel"><div class="panel-head"><div><h2>评分权重</h2><p class="page-subtitle">六项指标合计必须为 100%</p></div><div><div class="model-total ${total!==100?'invalid':''}" id="model-total">${total}%</div><span class="panel-note">当前合计</span></div></div>${Object.entries(appState.weights).map(([key,val])=>`<label class="weight-row"><span>${labels[key]}</span><input type="range" min="0" max="40" value="${val}" data-weight="${key}"><span class="weight-value" id="weight-${key}">${val}%</span></label>`).join('')}</section>
         <section class="panel"><div class="panel-head"><h2>决策阈值</h2><span class="panel-note">按总分判断</span></div><label class="field"><span class="field-label">优先引入</span><div class="inline"><input class="form-control" value="85" style="max-width:90px"><span>分及以上</span></div></label><label class="field"><span class="field-label">建议引入</span><div class="inline"><input class="form-control" value="75" style="max-width:90px"><span>至 84 分</span></div></label><label class="field"><span class="field-label">条件引入</span><div class="inline"><input class="form-control" value="65" style="max-width:90px"><span>至 74 分</span></div></label><label class="field"><span class="field-label">暂不引入</span><div class="inline"><input class="form-control" value="64" style="max-width:90px"><span>分及以下</span></div></label><div class="section"><div class="decision"><h3>当前模型版本</h3><p>招商适配模型 v1.3 · 最近更新于 2026-08-08</p></div></div></section></div>
-        <section class="panel" style="margin-top:16px"><div class="panel-head"><h2>评分预览</h2><span class="panel-note">使用当前权重重新计算</span></div><div class="table-wrap"><table><thead><tr><th>候选商户</th><th>业态</th><th class="num">当前得分</th><th>建议</th></tr></thead><tbody>${Object.values(candidates).map(p=>`<tr><td>${p.name}</td><td>${p.category}</td><td class="num">${p.score}</td><td><span class="badge">${p.verdict}</span></td></tr>`).join('')}</tbody></table></div></section>`;
+        <section class="panel" style="margin-top:16px"><div class="panel-head"><h2>评分预览</h2><span class="panel-note">使用当前权重重新计算</span></div><div class="table-wrap"><table><thead><tr><th>候选商户</th><th>业态</th><th class="num">当前得分</th><th class="num">可信度</th><th>建议</th></tr></thead><tbody>${Object.entries(candidates).map(([key,p])=>`<tr><td>${p.name}</td><td>${p.category}</td><td class="num">${p.score}</td><td class="num">${businessCases[key].confidence}%</td><td><span class="badge">${p.verdict}</span></td></tr>`).join('')}</tbody></table></div></section>
+        <div class="grid two" style="margin-top:16px"><section class="panel"><div class="panel-head"><h2>历史回测</h2><span class="badge blue">模拟样本</span></div><div class="grid three"><div><span class="metric-label">样本数量</span><div class="metric-value">42</div><div class="metric-note">近 24 个月招商</div></div><div><span class="metric-label">建议准确率</span><div class="metric-value">76%</div><div class="metric-note up">较 v1.2 +5pt</div></div><div><span class="metric-label">平均误差</span><div class="metric-value">8.4 分</div><div class="metric-note">目标低于 7 分</div></div></div></section><section class="panel"><div class="panel-head"><h2>模型使用边界</h2><span class="badge warn">人工复核</span></div><div class="decision risk"><h3>不能自动签约</h3><p>评分只提供招商建议；低样本业态、工程条件异常或租售比超过 15% 时必须进入人工审批。</p></div></section></div>`;
     }
 
     function render() {
       const current=route();
       document.querySelectorAll('[data-route]').forEach(link=>link.classList.toggle('active',link.dataset.route===current));
-      const views={analysis:renderAnalysis,merchants:renderMerchants,audience:renderAudience,operations:renderOperations,import:renderImport,model:renderModel};
+      const views={analysis:renderAnalysis,compare:renderCompare,merchants:renderMerchants,units:renderUnits,audience:renderAudience,operations:renderOperations,decisions:renderDecisions,import:renderImport,model:renderModel};
       document.getElementById('main-content').innerHTML=views[current]();
       document.getElementById('sidebar').classList.remove('open');
       document.getElementById('overlay').classList.remove('open');
@@ -649,6 +777,12 @@
     document.addEventListener('click',event=>{
       const candidate=event.target.closest('[data-candidate]');
       if(candidate){appState.candidate=candidate.dataset.candidate;render();return;}
+      const compareCandidate=event.target.closest('[data-compare-candidate]');
+      if(compareCandidate){appState.candidate=compareCandidate.dataset.compareCandidate;location.hash='analysis';return;}
+      const scenario=event.target.closest('[data-scenario]');
+      if(scenario){appState.scenario=scenario.dataset.scenario;render();return;}
+      const decisionAction=event.target.closest('[data-decision-action]');
+      if(decisionAction){showToast(`${decisionRecords[Number(decisionAction.dataset.decisionAction)].merchant} 的决策记录已打开`);return;}
       if(event.target.closest('#menu-toggle')){document.getElementById('sidebar').classList.add('open');document.getElementById('overlay').classList.add('open');return;}
       if(event.target.closest('#overlay')){document.getElementById('sidebar').classList.remove('open');event.target.classList.remove('open');return;}
       if(event.target.closest('#history-button')||event.target.closest('[data-open-history]')){openDrawer();return;}
