@@ -349,6 +349,74 @@
     .pipeline-step.warn { border-top-color: var(--orange); }
     .pipeline-step strong { display: block; font-size: 19px; margin-top: 5px; }
     .pipeline-step span { color: var(--muted); font-size: 12px; }
+    .merchant-locator {
+      display: grid;
+      grid-template-columns: minmax(320px, .78fr) minmax(420px, 1.3fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .search-result-list { display: grid; gap: 8px; }
+    .search-result {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .search-result:last-child { border-bottom: 0; }
+    .search-result p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .search-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; color: var(--muted); font-size: 12px; }
+    .geo-stage {
+      position: relative;
+      min-height: 420px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface-soft);
+    }
+    .geo-axis-x, .geo-axis-y { position: absolute; background: var(--line); }
+    .geo-axis-x { left: 7%; right: 7%; top: 50%; height: 1px; }
+    .geo-axis-y { top: 7%; bottom: 7%; left: 50%; width: 1px; }
+    .geo-ring {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      border: 1px solid #c7d2d6;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    .geo-ring.r1 { width: 32%; aspect-ratio: 1; }
+    .geo-ring.r2 { width: 62%; aspect-ratio: 1; }
+    .geo-ring.r3 { width: 92%; aspect-ratio: 1; }
+    .geo-ring-label { position: absolute; left: 51%; color: var(--muted); font-size: 11px; }
+    .geo-center, .geo-point {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      box-shadow: 0 3px 10px rgba(22, 39, 45, .18);
+    }
+    .geo-center { left: 50%; top: 50%; width: 36px; height: 36px; background: var(--text); color: #fff; z-index: 3; }
+    .geo-point { width: 30px; height: 30px; border: 2px solid var(--surface); background: var(--blue); color: #fff; z-index: 4; cursor: pointer; }
+    .geo-point.selected { background: var(--brand); width: 34px; height: 34px; }
+    .geo-point.outside { opacity: .3; }
+    .geo-legend {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: rgba(255,255,255,.94);
+      color: var(--muted);
+      font-size: 11px;
+      z-index: 6;
+    }
+    .selected-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+    .selected-item { display: inline-flex; align-items: center; gap: 6px; padding: 7px 9px; background: var(--brand-soft); color: var(--brand); border-radius: 5px; font-size: 12px; }
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -397,6 +465,7 @@
     @media (max-width: 1100px) {
       .grid.analysis { grid-template-columns: 1fr; }
       .grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .merchant-locator { grid-template-columns: 1fr; }
     }
     @media (max-width: 820px) {
       :root { --sidebar: 0px; }
@@ -431,6 +500,7 @@
       .pipeline { grid-template-columns: 1fr 1fr; }
       .mapping-row { grid-template-columns: 1fr; }
       .mapping-row .icon { display: none; }
+      .geo-stage { min-height: 340px; }
       .modal-backdrop { padding: 66px 10px 10px; }
     }
   </style>
@@ -527,6 +597,15 @@
       gym: {revenue:{low:50,base:62,high:76},grossMargin:75,fixedCost:28.8,rent:15,capex:180,breakeven:58.4,payback:25,rentBand:'13.5–16.0 万',confidence:81,range:'84–92',completeness:89,cannibalization:6,nearbyCompetitors:5,unit:'4F-02'}
     };
 
+    const candidateLocations = [
+      {id:'ms-finance',candidateKey:'coffee',merchant:'M Stand 咖啡',branch:'金融中心店',category:'饮品',address:'金融街 18 号（模拟地址）',distance:320,rating:4.6,monthlySales:'高',x:61,y:42,mapProvider:'mock',poiId:'mock-ms-001',lng:null,lat:null},
+      {id:'ms-park',candidateKey:'coffee',merchant:'M Stand 咖啡',branch:'中央公园店',category:'饮品',address:'中央公园南路 9 号（模拟地址）',distance:850,rating:4.5,monthlySales:'中高',x:34,y:24,mapProvider:'mock',poiId:'mock-ms-002',lng:null,lat:null},
+      {id:'hf-center',candidateKey:'food',merchant:'和府捞面',branch:'商务中心店',category:'餐饮',address:'商务大道 66 号（模拟地址）',distance:460,rating:4.4,monthlySales:'高',x:44,y:66,mapProvider:'mock',poiId:'mock-hf-001',lng:null,lat:null},
+      {id:'hf-east',candidateKey:'food',merchant:'和府捞面',branch:'东区广场店',category:'餐饮',address:'东区广场 B1 层（模拟地址）',distance:1200,rating:4.3,monthlySales:'中',x:79,y:72,mapProvider:'mock',poiId:'mock-hf-002',lng:null,lat:null},
+      {id:'ss-river',candidateKey:'gym',merchant:'超级猩猩',branch:'滨江训练馆',category:'健身',address:'滨江路 21 号 3 层（模拟地址）',distance:680,rating:4.8,monthlySales:'中高',x:70,y:34,mapProvider:'mock',poiId:'mock-ss-001',lng:null,lat:null},
+      {id:'ss-north',candidateKey:'gym',merchant:'超级猩猩',branch:'北区训练馆',category:'健身',address:'北区商务街 8 号（模拟地址）',distance:1550,rating:4.7,monthlySales:'中',x:23,y:80,mapProvider:'mock',poiId:'mock-ss-002',lng:null,lat:null}
+    ];
+
     const vacantUnits = [
       {code:'1F-07',floor:'1F',area:72,rent:6.5,power:80,water:'有',exhaust:'无',gas:'无',hours:'07:00–23:00',delivery:'2026-09-01',fit:{coffee:94,food:52,gym:28}},
       {code:'1F-12',floor:'1F',area:96,rent:8.1,power:100,water:'有',exhaust:'无',gas:'无',hours:'07:00–23:00',delivery:'2026-10-15',fit:{coffee:89,food:61,gym:35}},
@@ -550,6 +629,10 @@
       merchantFloor: '全部',
       operationPeriod: '本月',
       scenario: 'base',
+      compareSearch: '',
+      compareRadius: 1000,
+      compareGroup: '全部',
+      compareSelected: ['ms-finance','hf-center','ss-river'],
       history: [
         {name:'超级猩猩',score:88,result:'优先引入',time:'今天 10:32'},
         {name:'M Stand 咖啡',score:82,result:'建议引入',time:'昨天 16:18'},
@@ -592,6 +675,15 @@
     }
     function rankedUnits(key) { return [...vacantUnits].sort((a,b)=>b.fit[key]-a.fit[key]); }
     function confidenceLabel(value) { return value>=80?'高':value>=70?'中等':'偏低'; }
+    function filteredCandidateLocations() {
+      const keyword=appState.compareSearch.trim().toLowerCase();
+      return candidateLocations.filter(item =>
+        item.distance<=appState.compareRadius &&
+        (appState.compareGroup==='全部'||item.category===appState.compareGroup) &&
+        (!keyword||`${item.merchant}${item.branch}${item.address}${item.category}`.toLowerCase().includes(keyword))
+      );
+    }
+    function selectedCandidateLocations() { return appState.compareSelected.map(id=>candidateLocations.find(item=>item.id===id)).filter(Boolean); }
 
     function renderAnalysis() {
       const p = candidates[appState.candidate];
@@ -643,16 +735,31 @@
     }
 
     function renderCompare() {
-      const rows=Object.entries(candidates).map(([key,p])=>{
+      const results=filteredCandidateLocations();
+      const selected=selectedCandidateLocations();
+      const rows=selected.map(location=>{
+        const key=location.candidateKey;
+        const p=candidates[key];
         const bc=businessCases[key];
         const revenue=bc.revenue.base;
         const profit=revenue*bc.grossMargin/100-bc.fixedCost-bc.rent;
-        return {key,p,bc,revenue,profit,rentSales:bc.rent/revenue*100,unit:rankedUnits(key)[0]};
+        return {location,key,p,bc,revenue,profit,rentSales:bc.rent/revenue*100,unit:rankedUnits(key)[0]};
       });
-      return `${pageHeader('compare',`<button class="btn" data-toast="候选对比报告已生成">${icon('file-down')}生成对比报告</button>`)}
-        <div class="grid three" style="margin-bottom:16px"><div class="metric-card"><div class="metric-label">综合得分最高</div><div class="metric-value">超级猩猩 · 88</div><div class="metric-note up">业态互补与客群匹配突出</div></div><div class="metric-card"><div class="metric-label">预计营收最高</div><div class="metric-value">和府捞面 · 86 万</div><div class="metric-note warn">同时存在较高竞争分流</div></div><div class="metric-card"><div class="metric-label">风险收益最优</div><div class="metric-value">超级猩猩</div><div class="metric-note up">预计同业分流仅 6%</div></div></div>
-        <section class="panel"><div class="panel-head"><h2>候选商户横向比较</h2><span class="panel-note">基准情景</span></div><div class="table-wrap"><table style="min-width:980px"><thead><tr><th>候选商户</th><th>业态</th><th class="num">综合得分</th><th class="num">可信度</th><th class="num">预计月营收</th><th class="num">经营利润</th><th class="num">租售比</th><th class="num">回收期</th><th>推荐铺位</th><th>建议</th></tr></thead><tbody>${rows.map(row=>`<tr><td><strong>${row.p.name}</strong></td><td>${row.p.category}</td><td class="num">${row.p.score}</td><td class="num">${row.bc.confidence}%</td><td class="num">${row.revenue} 万</td><td class="num ${row.profit>0?'positive':'negative'}">${money(row.profit)} 万</td><td class="num">${row.rentSales.toFixed(1)}%</td><td class="num">${row.bc.payback} 月</td><td><span class="unit-code">${row.unit.code}</span> · ${row.unit.fit[row.key]}分</td><td><span class="badge ${row.p.verdict==='条件引入'?'warn':''}">${row.p.verdict}</span></td></tr>`).join('')}</tbody></table></div></section>
-        <div class="grid three" style="margin-top:16px">${rows.map(row=>`<section class="panel"><div class="panel-head"><h2>${row.p.name}</h2><span class="badge blue">区间 ${row.bc.range}</span></div><div class="decision"><h3>核心优势</h3><p>${row.p.opportunity}</p></div><div class="decision risk" style="margin-top:10px"><h3>主要约束</h3><p>${row.p.riskText}</p></div><div class="section"><a href="#analysis" class="btn" data-compare-candidate="${row.key}">${icon('scan-search')}进入详细测算</a></div></section>`).join('')}</div>`;
+      return `${pageHeader('compare',`<span class="badge blue">定位数据：模拟</span><button class="btn" data-toast="候选对比报告已生成">${icon('file-down')}生成对比报告</button>`)}
+        <div class="merchant-locator">
+          <section class="panel">
+            <div class="panel-head"><div><h2>搜索候选商户</h2><p class="page-subtitle">名称、门店或地址</p></div><span class="panel-note">最多选择 3 个</span></div>
+            <label class="field" style="margin-top:0"><span class="field-label">关键词</span><span class="inline"><span class="input-icon" style="flex:1">${icon('search')}<input id="compare-search" class="form-control" value="${appState.compareSearch}" placeholder="例如：M Stand、金融中心店"></span><button type="button" class="btn" id="compare-search-button">搜索</button></span></label>
+            <div class="form-row"><label class="field"><span class="field-label">业态</span><select id="compare-group" class="form-select">${['全部','餐饮','饮品','健身'].map(v=>`<option ${v===appState.compareGroup?'selected':''}>${v}</option>`).join('')}</select></label><label class="field"><span class="field-label">搜索半径</span><select id="compare-radius" class="form-select"><option value="500" ${appState.compareRadius===500?'selected':''}>500 米</option><option value="1000" ${appState.compareRadius===1000?'selected':''}>1 公里</option><option value="2000" ${appState.compareRadius===2000?'selected':''}>2 公里</option></select></label></div>
+            <div class="section"><div class="section-title"><h3>搜索结果</h3><span class="panel-note">${results.length} 家门店</span></div><div class="search-result-list">${results.length?results.map(item=>{const isSelected=appState.compareSelected.includes(item.id);return `<div class="search-result"><div><h3>${item.merchant} · ${item.branch}</h3><p>${item.address}</p><div class="search-meta"><span>${item.category}</span><span>${item.distance}m</span><span>评分 ${item.rating}</span><span>销售指数 ${item.monthlySales}</span></div></div><button class="btn ${isSelected?'danger':''}" data-location-id="${item.id}" aria-pressed="${isSelected}">${isSelected?'移出':'加入对比'}</button></div>`}).join(''):'<div class="empty">当前条件下没有匹配的门店</div>'}</div></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div><h2>楼宇周边相对位置</h2><p class="page-subtitle">以环球中心 A 座为中心</p></div><span class="panel-note">半径 ${appState.compareRadius>=1000?appState.compareRadius/1000+'km':appState.compareRadius+'m'}</span></div>
+            <div class="geo-stage" aria-label="楼宇周边候选商户相对位置示意"><div class="geo-axis-x"></div><div class="geo-axis-y"></div><div class="geo-ring r1"></div><div class="geo-ring r2"></div><div class="geo-ring r3"></div><span class="geo-ring-label" style="top:34%">${Math.round(appState.compareRadius/3)}m</span><span class="geo-ring-label" style="top:18%">${Math.round(appState.compareRadius*2/3)}m</span><span class="geo-ring-label" style="top:5%">${appState.compareRadius}m</span><div class="geo-center" aria-label="环球中心 A 座">${icon('building-2')}</div>${candidateLocations.map(item=>{const selectedPoint=appState.compareSelected.includes(item.id);const outside=item.distance>appState.compareRadius;return `<button class="geo-point ${selectedPoint?'selected':''} ${outside?'outside':''}" style="left:${item.x}%;top:${item.y}%" data-location-id="${item.id}" aria-label="${item.merchant}${item.branch}，距离${item.distance}米" data-tooltip="${item.merchant} · ${item.branch} · ${item.distance}m">${item.candidateKey==='coffee'?'咖':item.candidateKey==='food'?'餐':'健'}</button>`}).join('')}<div class="geo-legend">中心：目标楼宇 · 绿色：已选 · 蓝色：候选 · 淡色：半径外</div></div>
+            <div class="section"><div class="section-title"><h3>已选门店</h3><span class="panel-note">${selected.length} / 3</span></div><div class="selected-strip">${selected.length?selected.map(item=>`<span class="selected-item">${item.merchant} · ${item.branch}<button class="icon-btn" style="width:24px;min-height:24px" data-location-id="${item.id}" aria-label="移出${item.merchant}${item.branch}">${icon('x')}</button></span>`).join(''):'<span class="panel-note">尚未选择候选门店</span>'}</div></div>
+          </section>
+        </div>
+        <section class="panel" style="margin-top:16px"><div class="panel-head"><h2>已选门店横向比较</h2><span class="panel-note">基准经营情景</span></div><div class="table-wrap"><table style="min-width:1120px"><thead><tr><th>候选门店</th><th>位置</th><th class="num">距离</th><th class="num">综合得分</th><th class="num">可信度</th><th class="num">预计月营收</th><th class="num">经营利润</th><th class="num">租售比</th><th>推荐铺位</th><th>操作</th></tr></thead><tbody>${rows.length?rows.map(row=>`<tr><td><strong>${row.location.merchant}</strong><br><span class="panel-note">${row.location.branch}</span></td><td>${row.location.address}</td><td class="num">${row.location.distance}m</td><td class="num">${row.p.score}</td><td class="num">${row.bc.confidence}%</td><td class="num">${row.revenue} 万</td><td class="num ${row.profit>0?'positive':'negative'}">${money(row.profit)} 万</td><td class="num">${row.rentSales.toFixed(1)}%</td><td><span class="unit-code">${row.unit.code}</span> · ${row.unit.fit[row.key]}分</td><td><a href="#analysis" class="btn" data-compare-candidate="${row.key}">${icon('scan-search')}详细测算</a></td></tr>`).join(''):'<tr><td colspan="10" class="empty">请从搜索结果中选择候选门店</td></tr>'}</tbody></table></div></section>`;
     }
 
     function renderUnits() {
@@ -783,6 +890,16 @@
       if(scenario){appState.scenario=scenario.dataset.scenario;render();return;}
       const decisionAction=event.target.closest('[data-decision-action]');
       if(decisionAction){showToast(`${decisionRecords[Number(decisionAction.dataset.decisionAction)].merchant} 的决策记录已打开`);return;}
+      const locationTarget=event.target.closest('[data-location-id]');
+      if(locationTarget){
+        const id=locationTarget.dataset.locationId;
+        const index=appState.compareSelected.indexOf(id);
+        if(index>=0) appState.compareSelected.splice(index,1);
+        else if(appState.compareSelected.length>=3){showToast('最多选择 3 家候选门店');return;}
+        else appState.compareSelected.push(id);
+        render();return;
+      }
+      if(event.target.closest('#compare-search-button')){appState.compareSearch=document.getElementById('compare-search').value;render();return;}
       if(event.target.closest('#menu-toggle')){document.getElementById('sidebar').classList.add('open');document.getElementById('overlay').classList.add('open');return;}
       if(event.target.closest('#overlay')){document.getElementById('sidebar').classList.remove('open');event.target.classList.remove('open');return;}
       if(event.target.closest('#history-button')||event.target.closest('[data-open-history]')){openDrawer();return;}
@@ -811,6 +928,7 @@
     });
 
     document.addEventListener('input',event=>{
+      if(event.target.id==='compare-search') appState.compareSearch=event.target.value;
       if(event.target.id==='merchant-search'){
         appState.merchantSearch=event.target.value;
         document.getElementById('merchant-tbody').innerHTML=merchantRows();
@@ -826,12 +944,17 @@
       }
     });
     document.addEventListener('change',event=>{
+      if(event.target.id==='compare-group'){appState.compareGroup=event.target.value;render();}
+      if(event.target.id==='compare-radius'){appState.compareRadius=Number(event.target.value);render();}
       if(event.target.id==='merchant-group'){appState.merchantGroup=event.target.value;document.getElementById('merchant-tbody').innerHTML=merchantRows();document.getElementById('merchant-count').textContent=`显示 ${filteredMerchants().length} / 25 家商户`;}
       if(event.target.id==='merchant-floor'){appState.merchantFloor=event.target.value;document.getElementById('merchant-tbody').innerHTML=merchantRows();document.getElementById('merchant-count').textContent=`显示 ${filteredMerchants().length} / 25 家商户`;}
       if(event.target.id==='operation-period'){appState.operationPeriod=event.target.value;render();}
       if(event.target.id==='data-file'){const button=document.getElementById('import-button');button.disabled=!event.target.files.length;if(event.target.files.length)showToast(`已选择 ${event.target.files[0].name}`);}
     });
-    document.addEventListener('keydown',event=>{if(event.key==='Escape')closeDrawer();});
+    document.addEventListener('keydown',event=>{
+      if(event.key==='Escape')closeDrawer();
+      if(event.key==='Enter'&&event.target.id==='compare-search'){appState.compareSearch=event.target.value;render();}
+    });
     render();
   </script>
 </body>
