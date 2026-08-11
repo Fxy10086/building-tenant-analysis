@@ -53,15 +53,17 @@ export async function GET(request) {
       return errorResponse('缺少有效的中心坐标');
     }
     const radius = Math.min(5000, Math.max(100, Number(params.get('radius')) || 1000));
-    const result = await amapRequest('/v5/place/around', {
+    const result = await amapRequest('/v3/place/around', {
       location,
       radius,
       keywords: (params.get('keywords') || '').slice(0, 50),
       types: (params.get('types') || '').slice(0, 80),
       city: '110000',
       city_limit: 'true',
-      show_fields: 'business',
-      page_size: 20
+      sortrule: 'distance',
+      extensions: 'all',
+      offset: 20,
+      page: 1
     });
     if (result.error) return errorResponse(result.error, result.status);
 
@@ -76,8 +78,8 @@ export async function GET(request) {
         distance: Number(poi.distance) || 0,
         lng,
         lat,
-        rating: poi.business?.rating || null,
-        cost: poi.business?.cost || null
+        rating: poi.biz_ext?.rating || null,
+        cost: poi.biz_ext?.cost || null
       };
     }).filter(poi => poi.id && Number.isFinite(poi.lng) && Number.isFinite(poi.lat));
 
@@ -86,4 +88,3 @@ export async function GET(request) {
 
   return errorResponse('不支持的高德操作');
 }
-
