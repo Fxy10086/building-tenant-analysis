@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>楼宇招商分析台</title>
+  <meta name="description" content="写字楼商户招商适配分析与经营数据工作台">
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3f6f7;
+      --surface: #ffffff;
+      --surface-soft: #f8fafb;
+      --text: #152126;
+      --muted: #68767d;
+      --line: #dce3e6;
+      --brand: #0c7c68;
+      --brand-soft: #e4f4f0;
+      --orange: #c97618;
+      --orange-soft: #fff2dc;
+      --blue: #3977a5;
+      --blue-soft: #eaf2f8;
+      --red: #b9433f;
+      --red-soft: #fbeceb;
+      --shadow: 0 10px 30px rgba(24, 41, 48, .08);
+      --sidebar: 208px;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--text);
+      background: var(--bg);
+      font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+    button, input, select { font: inherit; letter-spacing: 0; }
+    button, a, input, select { -webkit-tap-highlight-color: transparent; }
+    button { cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 24px; font-weight: 600; }
+    h2 { font-size: 17px; font-weight: 600; }
+    h3 { font-size: 14px; font-weight: 600; }
+    .icon { width: 17px; height: 17px; stroke-width: 1.8; }
+    .app { min-height: 100vh; }
+    .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: var(--sidebar);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+    }
+    .brand {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 600;
+    }
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: var(--brand);
+      flex: 0 0 auto;
+    }
+    .nav { padding: 16px 10px; flex: 1; }
+    .nav-label {
+      margin: 7px 9px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .nav-link {
+      min-height: 40px;
+      margin: 3px 0;
+      padding: 0 11px;
+      border-radius: 6px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+    }
+    .nav-link:hover { background: var(--surface-soft); color: var(--text); }
+    .nav-link.active { color: var(--brand); background: var(--brand-soft); font-weight: 600; }
+    .sidebar-foot {
+      border-top: 1px solid var(--line);
+      margin: 0 12px;
+      padding: 15px 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .workspace { margin-left: var(--sidebar); min-height: 100vh; }
+    .topbar {
+      height: 64px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      background: rgba(255, 255, 255, .94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+    .topbar-left, .top-actions, .inline, .page-actions, .button-row, .badge-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .building-name { font-size: 13px; color: var(--muted); }
+    .main { padding: 24px; max-width: 1440px; margin: 0 auto; }
+    .page-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 20px;
+    }
+    .page-subtitle { margin-top: 6px; color: var(--muted); font-size: 13px; }
+    .btn, .icon-btn {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 13px;
+    }
+    .icon-btn { width: 38px; padding: 0; }
+    .btn:hover, .icon-btn:hover { border-color: #b8c5ca; background: var(--surface-soft); }
+    .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+    .btn.primary:hover { background: #086d5c; }
+    .btn.danger { color: var(--red); }
+    .btn:disabled { cursor: not-allowed; opacity: .5; }
+    .mobile-menu { display: none; }
+    .grid { display: grid; gap: 16px; }
+    .grid.analysis { grid-template-columns: minmax(300px, .84fr) minmax(500px, 1.45fr); align-items: start; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .panel, .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      box-shadow: 0 1px 0 rgba(31, 47, 54, .02);
+    }
+    .panel { padding: 18px; }
+    .metric-card { padding: 16px; }
+    .metric-label { color: var(--muted); font-size: 12px; }
+    .metric-value { margin-top: 7px; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .metric-note { margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .metric-note.up { color: var(--brand); }
+    .metric-note.warn { color: var(--orange); }
+    .panel-head {
+      min-height: 28px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 15px;
+    }
+    .panel-note { color: var(--muted); font-size: 12px; }
+    .field { display: block; margin-top: 14px; }
+    .field-label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .form-control, .form-select {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface-soft);
+      color: var(--text);
+      padding: 0 11px;
+      outline: none;
+    }
+    .form-control:focus, .form-select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+    .input-icon { position: relative; }
+    .input-icon .icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+    .input-icon .form-control { padding-left: 36px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+    .chip {
+      min-height: 32px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .chip.active { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+    .button-row { margin-top: 18px; }
+    .button-row .primary { flex: 1; }
+    .result-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .score-wrap { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .score-ring {
+      --score: 82;
+      width: 74px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(var(--brand) calc(var(--score) * 1%), var(--line) 0);
+      position: relative;
+      flex: 0 0 auto;
+    }
+    .score-ring::after { content: ""; position: absolute; inset: 7px; background: var(--surface); border-radius: 50%; }
+    .score-ring span { position: relative; z-index: 1; font-size: 23px; font-weight: 600; }
+    .badge-row { flex-wrap: wrap; margin-top: 7px; }
+    .badge {
+      min-height: 26px;
+      padding: 0 8px;
+      border-radius: 99px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge.warn { background: var(--orange-soft); color: var(--orange); }
+    .badge.blue { background: var(--blue-soft); color: var(--blue); }
+    .summary { color: var(--muted); font-size: 12px; margin-top: 6px; max-width: 620px; }
+    .section { margin-top: 20px; }
+    .section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+    .bars { display: grid; gap: 11px; }
+    .bar-row { display: grid; grid-template-columns: 88px minmax(80px, 1fr) 40px; align-items: center; gap: 10px; font-size: 12px; }
+    .track { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+    .fill { height: 100%; width: calc(var(--value) * 1%); background: var(--brand); border-radius: inherit; transition: width .25s ease; }
+    .bar-row.warn .fill { background: var(--orange); }
+    .bar-value { text-align: right; font-variant-numeric: tabular-nums; }
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 11px 9px; border-bottom: 1px solid var(--line); text-align: left; font-size: 12px; }
+    th { color: var(--muted); font-weight: 500; background: var(--surface-soft); }
+    tbody tr:hover { background: #fafcfc; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .positive { color: var(--brand); }
+    .negative { color: var(--red); }
+    .decision-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .decision { border-left: 3px solid var(--brand); padding: 9px 11px; background: var(--surface-soft); }
+    .decision.risk { border-left-color: var(--orange); }
+    .decision p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 16px; }
+    .toolbar .field { margin: 0; min-width: 150px; }
+    .toolbar .search { flex: 1; min-width: 220px; }
+    .category-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; background: var(--brand); }
+    .category-swatch.drink { background: var(--blue); }
+    .category-swatch.gym { background: var(--orange); }
+    .category-swatch.retail { background: #8a5fa0; }
+    .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+    .chart-shell { min-height: 246px; }
+    .chart { width: 100%; height: auto; display: block; }
+    .chart text { fill: var(--muted); font-size: 11px; }
+    .chart .gridline { stroke: var(--line); stroke-width: 1; }
+    .chart .line { fill: none; stroke: var(--brand); stroke-width: 3; }
+    .chart .area { fill: var(--brand-soft); }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 12px; margin-top: 10px; }
+    .legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--brand); margin-right: 6px; }
+    .legend span:nth-child(2)::before { background: var(--blue); }
+    .legend span:nth-child(3)::before { background: var(--orange); }
+    .stacked { display: flex; height: 22px; border-radius: 5px; overflow: hidden; background: var(--line); }
+    .stacked span { height: 100%; }
+    .stacked .food { width: 60%; background: var(--brand); }
+    .stacked .drink { width: 20%; background: var(--blue); }
+    .stacked .gym { width: 12%; background: var(--orange); }
+    .stacked .retail { width: 8%; background: #8a5fa0; }
+    .segment-row { display: grid; grid-template-columns: 90px 1fr 46px; gap: 10px; align-items: center; margin-top: 12px; font-size: 12px; }
+    .segment-row strong { text-align: right; }
+    .dropzone {
+      min-height: 180px;
+      border: 1px dashed #afbec4;
+      border-radius: 7px;
+      background: var(--surface-soft);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 24px;
+    }
+    .dropzone .drop-icon { width: 40px; height: 40px; color: var(--brand); margin-bottom: 10px; }
+    .dropzone p { color: var(--muted); font-size: 12px; margin-top: 5px; }
+    .dropzone input { max-width: 100%; margin-top: 14px; }
+    .mapping-list { display: grid; gap: 10px; }
+    .mapping-row { display: grid; grid-template-columns: 1fr 22px 1fr; align-items: center; gap: 8px; }
+    .mapping-row .icon { color: var(--muted); }
+    .weight-row { display: grid; grid-template-columns: 110px minmax(120px, 1fr) 54px; gap: 12px; align-items: center; margin-top: 16px; }
+    .weight-row input[type="range"] { width: 100%; accent-color: var(--brand); }
+    .weight-value { text-align: right; font-variant-numeric: tabular-nums; }
+    .model-total { font-size: 28px; font-weight: 600; color: var(--brand); }
+    .model-total.invalid { color: var(--red); }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(12, 24, 28, .32);
+      display: none;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 70px 22px 22px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .drawer {
+      width: min(430px, 100%);
+      max-height: calc(100vh - 92px);
+      overflow-y: auto;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .history-item { padding: 13px 0; border-bottom: 1px solid var(--line); }
+    .history-item:last-child { border-bottom: 0; }
+    .history-item p { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 100;
+      min-width: 220px;
+      max-width: calc(100vw - 48px);
+      background: #183b34;
+      color: #fff;
+      padding: 12px 14px;
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: .2s ease;
+      font-size: 13px;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .overlay { display: none; }
+    @media (max-width: 1100px) {
+      .grid.analysis { grid-template-columns: 1fr; }
+      .grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 820px) {
+      :root { --sidebar: 0px; }
+      .sidebar { width: 230px; transform: translateX(-100%); transition: transform .22s ease; box-shadow: var(--shadow); }
+      .sidebar.open { transform: translateX(0); }
+      .workspace { margin-left: 0; }
+      .mobile-menu { display: inline-flex; }
+      .overlay { position: fixed; inset: 0; z-index: 25; background: rgba(13, 24, 28, .28); }
+      .overlay.open { display: block; }
+      .grid.two, .grid.three { grid-template-columns: 1fr; }
+      .main { padding: 18px; }
+      .topbar { padding: 0 16px; }
+    }
+    @media (max-width: 560px) {
+      h1 { font-size: 21px; }
+      .main { padding: 14px; }
+      .top-actions .hide-mobile, .building-name { display: none; }
+      .page-head { display: block; }
+      .page-actions { margin-top: 14px; flex-wrap: wrap; }
+      .grid.four { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .metric-card { padding: 13px; }
+      .metric-value { font-size: 21px; }
+      .form-row, .decision-grid { grid-template-columns: 1fr; }
+      .result-head { display: block; }
+      .result-head > .panel-note { margin-top: 10px; }
+      .score-ring { width: 66px; }
+      .bar-row { grid-template-columns: 74px minmax(60px, 1fr) 34px; gap: 7px; }
+      .weight-row { grid-template-columns: 90px minmax(90px, 1fr) 46px; gap: 8px; }
+      .mapping-row { grid-template-columns: 1fr; }
+      .mapping-row .icon { display: none; }
+      .modal-backdrop { padding: 66px 10px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#analysis">
+        <span class="brand-mark"><i data-lucide="building-2" class="icon" aria-hidden="true"></i></span>
+        <span>楼宇招商分析台</span>
+      </a>
+      <nav class="nav" aria-label="主导航">
+        <div class="nav-label">工作台</div>
+        <a class="nav-link" data-route="analysis" href="#analysis"><i data-lucide="scan-search" class="icon" aria-hidden="true"></i>招商分析</a>
+        <a class="nav-link" data-route="merchants" href="#merchants"><i data-lucide="store" class="icon" aria-hidden="true"></i>楼内商户</a>
+        <a class="nav-link" data-route="audience" href="#audience"><i data-lucide="users" class="icon" aria-hidden="true"></i>客群画像</a>
+        <a class="nav-link" data-route="operations" href="#operations"><i data-lucide="chart-no-axes-combined" class="icon" aria-hidden="true"></i>经营数据</a>
+        <div class="nav-label" style="margin-top:20px">管理</div>
+        <a class="nav-link" data-route="import" href="#import"><i data-lucide="database" class="icon" aria-hidden="true"></i>数据导入</a>
+        <a class="nav-link" data-route="model" href="#model"><i data-lucide="sliders-horizontal" class="icon" aria-hidden="true"></i>评分模型</a>
+      </nav>
+      <div class="sidebar-foot">模拟数据环境 · 25 家商户</div>
+    </aside>
+    <div class="overlay" id="overlay"></div>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="icon-btn mobile-menu" id="menu-toggle" aria-label="打开导航"><i data-lucide="menu" class="icon" aria-hidden="true"></i></button>
+          <span class="building-name">环球中心 A 座 · 招商部</span>
+        </div>
+        <div class="top-actions">
+          <button class="btn hide-mobile" id="history-button"><i data-lucide="history" class="icon" aria-hidden="true"></i>分析历史</button>
+          <button class="icon-btn" id="notification-button" aria-label="消息"><i data-lucide="bell" class="icon" aria-hidden="true"></i></button>
+          <button class="icon-btn" id="account-button" aria-label="账户"><i data-lucide="user-round" class="icon" aria-hidden="true"></i></button>
+        </div>
+      </header>
+      <main class="main" id="main-content"></main>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="drawer-backdrop">
+    <section class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <div class="drawer-head">
+        <h2 id="drawer-title">分析历史</h2>
+        <button class="icon-btn" id="drawer-close" aria-label="关闭"><i data-lucide="x" class="icon" aria-hidden="true"></i></button>
+      </div>
+      <div id="drawer-content"></div>
+    </section>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    const merchants = [
+      {id:1,name:'老乡鸡',group:'餐饮',subtype:'中式快餐',floor:'B1',spend:32,area:180,daily:510,revenue:112,rent:8.6,status:'在营'},
+      {id:2,name:'麦当劳',group:'餐饮',subtype:'西式快餐',floor:'1F',spend:35,area:220,daily:680,revenue:145,rent:13.2,status:'在营'},
+      {id:3,name:'吉野家',group:'餐饮',subtype:'日式简餐',floor:'B1',spend:38,area:120,daily:390,revenue:82,rent:7.1,status:'在营'},
+      {id:4,name:'赛百味',group:'餐饮',subtype:'轻食简餐',floor:'1F',spend:42,area:75,daily:260,revenue:58,rent:5.2,status:'在营'},
+      {id:5,name:'西贝莜面村',group:'餐饮',subtype:'西北菜',floor:'2F',spend:86,area:320,daily:330,revenue:176,rent:17.6,status:'在营'},
+      {id:6,name:'云海肴',group:'餐饮',subtype:'云南菜',floor:'2F',spend:92,area:280,daily:300,revenue:165,rent:16.1,status:'在营'},
+      {id:7,name:'海底捞',group:'餐饮',subtype:'川味火锅',floor:'3F',spend:128,area:450,daily:420,revenue:260,rent:24.8,status:'在营'},
+      {id:8,name:'喜家德',group:'餐饮',subtype:'饺子',floor:'B1',spend:40,area:130,daily:360,revenue:78,rent:7.5,status:'在营'},
+      {id:9,name:'永和大王',group:'餐饮',subtype:'中式简餐',floor:'B1',spend:30,area:140,daily:450,revenue:88,rent:7.8,status:'在营'},
+      {id:10,name:'陈香贵',group:'餐饮',subtype:'兰州牛肉面',floor:'B1',spend:39,area:115,daily:410,revenue:80,rent:7.2,status:'在营'},
+      {id:11,name:'Wagas',group:'餐饮',subtype:'西式轻食',floor:'1F',spend:75,area:160,daily:280,revenue:126,rent:11.8,status:'在营'},
+      {id:12,name:'食其家',group:'餐饮',subtype:'日式盖饭',floor:'B1',spend:36,area:95,daily:370,revenue:73,rent:6.4,status:'在营'},
+      {id:13,name:'达美乐披萨',group:'餐饮',subtype:'披萨',floor:'1F',spend:65,area:110,daily:250,revenue:92,rent:8.1,status:'在营'},
+      {id:14,name:'小杨生煎',group:'餐饮',subtype:'上海小吃',floor:'B1',spend:28,area:90,daily:440,revenue:76,rent:6.2,status:'在营'},
+      {id:15,name:'很久以前羊肉串',group:'餐饮',subtype:'烧烤',floor:'3F',spend:105,area:300,daily:310,revenue:172,rent:16.8,status:'在营'},
+      {id:16,name:'星巴克',group:'饮品',subtype:'咖啡',floor:'1F',spend:39,area:110,daily:350,revenue:110,rent:10.6,status:'在营'},
+      {id:17,name:'瑞幸咖啡',group:'饮品',subtype:'咖啡',floor:'B1',spend:22,area:65,daily:520,revenue:90,rent:5.6,status:'在营'},
+      {id:18,name:'喜茶',group:'饮品',subtype:'新式茶饮',floor:'1F',spend:28,area:80,daily:480,revenue:104,rent:8.3,status:'在营'},
+      {id:19,name:'奈雪的茶',group:'饮品',subtype:'茶饮烘焙',floor:'1F',spend:30,area:95,daily:420,revenue:102,rent:9.1,status:'在营'},
+      {id:20,name:'霸王茶姬',group:'饮品',subtype:'原叶鲜奶茶',floor:'B1',spend:25,area:70,daily:500,revenue:98,rent:6.9,status:'在营'},
+      {id:21,name:'乐刻健身',group:'健身',subtype:'24 小时健身房',floor:'4F',spend:129,area:450,daily:190,revenue:55,rent:13.5,status:'在营'},
+      {id:22,name:'威尔仕健身',group:'健身',subtype:'综合健身房',floor:'4F',spend:399,area:1200,daily:260,revenue:98,rent:28.6,status:'在营'},
+      {id:23,name:'一兆韦德',group:'健身',subtype:'会籍制健身房',floor:'5F',spend:329,area:1000,daily:230,revenue:82,rent:24.2,status:'在营'},
+      {id:24,name:'名创优品',group:'百货',subtype:'生活百货',floor:'2F',spend:45,area:230,daily:380,revenue:118,rent:14.4,status:'在营'},
+      {id:25,name:'无印良品',group:'百货',subtype:'生活方式百货',floor:'2F',spend:120,area:550,daily:290,revenue:186,rent:26.5,status:'在营'}
+    ];
+
+    const candidates = {
+      coffee: {name:'M Stand 咖啡',category:'精品咖啡',group:'饮品',price:'38 元',area:'85 ㎡',rent:'7.5 万元',score:82,verdict:'建议引入',risk:'关注同业竞争',summary:'能补充下午消费场景，客群匹配较高；建议用租金条件控制同业竞争风险。',bars:[['客群匹配',91],['业态互补',72],['消费时段',88],['租金承受',78],['竞争强度',58,true]],table:[['客单价','38 元','29 元','+31.0%','positive'],['日均订单','380 单','454 单','-16.3%','negative'],['午后订单占比','42%','40%','+2.0pt','positive'],['预估坪效','2,980 元','3,224 元','-7.6%','negative']],opportunity:'白领客群占比 73%，下午茶消费需求高于现有供给。',riskText:'楼内已有 5 家饮品店，需突出精品咖啡定位并避免同层重叠。'},
+      food: {name:'和府捞面',category:'快餐简餐',group:'餐饮',price:'46 元',area:'160 ㎡',rent:'11 万元',score:74,verdict:'条件引入',risk:'租金承压',summary:'午餐需求稳定，但面积和租金压力较高；建议优先谈判保底租金与营业额抽成组合。',bars:[['客群匹配',86],['业态互补',61],['消费时段',94],['租金承受',56,true],['竞争强度',63,true]],table:[['客单价','46 元','52 元','-11.5%','positive'],['日均订单','420 单','402 单','+4.5%','positive'],['午餐订单占比','68%','62%','+6.0pt','positive'],['预估坪效','2,240 元','2,380 元','-5.9%','negative']],opportunity:'楼内企业员工超 6,000 人，工作日午餐存在稳定刚需。',riskText:'楼内已有 15 家餐饮，需以高翻台率和差异化套餐争取份额。'},
+      gym: {name:'超级猩猩',category:'运动健身',group:'健身',price:'89 元/次',area:'280 ㎡',rent:'15 万元',score:88,verdict:'优先引入',risk:'关注晚间客流',summary:'按次付费模式与楼内年轻白领高度匹配，可补充现有会籍制健身房。',bars:[['客群匹配',94],['业态互补',96],['消费时段',87],['租金承受',76],['竞争强度',92]],table:[['单次消费','89 元','118 元','-24.6%','positive'],['月活用户','1,180 人','1,120 人','+5.4%','positive'],['晚间消费占比','64%','51%','+13.0pt','positive'],['预估坪效','1,860 元','1,720 元','+8.1%','positive']],opportunity:'按次付费模式与楼内 3 家会籍制健身房形成明显互补。',riskText:'周末楼宇客流偏低，需核验品牌周末独立获客能力。'}
+    };
+
+    const appState = {
+      candidate: 'coffee',
+      merchantSearch: '',
+      merchantGroup: '全部',
+      merchantFloor: '全部',
+      operationPeriod: '本月',
+      history: [
+        {name:'超级猩猩',score:88,result:'优先引入',time:'今天 10:32'},
+        {name:'M Stand 咖啡',score:82,result:'建议引入',time:'昨天 16:18'},
+        {name:'和府捞面',score:74,result:'条件引入',time:'8 月 9 日 14:05'}
+      ],
+      weights: {customer:26,complement:24,spend:16,time:12,competition:12,rent:10}
+    };
+
+    const pageMeta = {
+      analysis:['新商户适配分析','评估候选商户与楼宇客群、业态结构及经营目标的匹配程度'],
+      merchants:['楼内商户','管理 25 家在营商户并查看楼宇业态结构'],
+      audience:['客群画像','基于楼宇企业、员工与消费时段数据形成招商客群基准'],
+      operations:['经营数据','跟踪商户营收、坪效、租金和楼宇商业活跃度'],
+      import:['数据导入','导入商户经营数据并映射到统一分析字段'],
+      model:['评分模型','配置招商适配度计算权重和决策阈值']
+    };
+
+    function route() {
+      const value = location.hash.replace('#','');
+      return pageMeta[value] ? value : 'analysis';
+    }
+
+    function icon(name) { return `<i data-lucide="${name}" class="icon" aria-hidden="true"></i>`; }
+    function pageHeader(key, actions='') {
+      return `<div class="page-head"><div><h1>${pageMeta[key][0]}</h1><p class="page-subtitle">${pageMeta[key][1]}</p></div>${actions ? `<div class="page-actions">${actions}</div>` : ''}</div>`;
+    }
+    function groupClass(group) { return group === '饮品' ? 'drink' : group === '健身' ? 'gym' : group === '百货' ? 'retail' : ''; }
+    function money(value) { return Number(value).toLocaleString('zh-CN',{minimumFractionDigits: value % 1 ? 1 : 0,maximumFractionDigits:1}); }
+    function groupCount(group) { return merchants.filter(item => item.group === group).length; }
+
+    function renderAnalysis() {
+      const p = candidates[appState.candidate];
+      return `${pageHeader('analysis',`<button class="btn" data-open-history>${icon('history')}分析历史</button>`)}
+        <div class="grid analysis">
+          <div class="grid">
+            <section class="panel">
+              <div class="panel-head"><h2>候选商户</h2><span class="panel-note">外部品牌</span></div>
+              <label class="field"><span class="field-label">商户名称</span><span class="input-icon">${icon('search')}<input class="form-control" id="candidate-name" value="${p.name}" autocomplete="off"></span></label>
+              <div class="chips">${Object.entries(candidates).map(([key,item]) => `<button class="chip ${key===appState.candidate?'active':''}" data-candidate="${key}">${item.name}</button>`).join('')}</div>
+              <div class="form-row">
+                <label class="field"><span class="field-label">业态</span><select class="form-select" id="candidate-category"><option>${p.category}</option><option>精品咖啡</option><option>快餐简餐</option><option>运动健身</option><option>生活百货</option></select></label>
+                <label class="field"><span class="field-label">客单价</span><input class="form-control" id="candidate-price" value="${p.price}"></label>
+                <label class="field"><span class="field-label">所需面积</span><input class="form-control" value="${p.area}"></label>
+                <label class="field"><span class="field-label">月租承受</span><input class="form-control" value="${p.rent}"></label>
+              </div>
+              <div class="button-row"><button class="btn primary" id="analyze-button">${icon('sparkles')}生成招商分析</button><button class="icon-btn" aria-label="上传候选商户资料" data-toast="候选商户资料入口已就绪">${icon('upload')}</button></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>楼宇基准</h2><span class="panel-note">截至 2026-08-10</span></div>
+              <div class="grid two"><div><span class="metric-label">在营商户</span><div class="metric-value">25</div></div><div><span class="metric-label">商业空置率</span><div class="metric-value">8.2%</div></div></div>
+              <div class="section"><div class="stacked" aria-label="餐饮15家，饮品5家，健身3家，百货2家"><span class="food"></span><span class="drink"></span><span class="gym"></span><span class="retail"></span></div><div class="legend"><span>餐饮 15</span><span>饮品 5</span><span>健身 3</span><span>百货 2</span></div></div>
+            </section>
+          </div>
+          <section class="panel">
+            <div class="result-head"><div class="score-wrap"><div class="score-ring" style="--score:${p.score}"><span>${p.score}</span></div><div><h2><span id="result-name">${p.name}</span> · 招商建议</h2><div class="badge-row"><span class="badge">${icon('circle-check')}${p.verdict}</span><span class="badge warn">${p.risk}</span></div><p class="summary">${p.summary}</p></div></div><span class="panel-note">模型已计算</span></div>
+            <div class="section"><div class="section-title"><h3>适配度构成</h3><span class="panel-note">总分 ${p.score}</span></div><div class="bars">${p.bars.map(row=>`<div class="bar-row ${row[2]?'warn':''}"><span>${row[0]}</span><div class="track"><div class="fill" style="--value:${row[1]}"></div></div><span class="bar-value">${row[1]}</span></div>`).join('')}</div></div>
+            <div class="section"><div class="section-title"><h3>与楼内同业对比</h3><span class="panel-note">楼内${p.group} ${groupCount(p.group)} 家</span></div><div class="table-wrap"><table><thead><tr><th>指标</th><th class="num">候选商户</th><th class="num">楼内同业均值</th><th class="num">差异</th></tr></thead><tbody>${p.table.map(row=>`<tr><td>${row[0]}</td><td class="num">${row[1]}</td><td class="num">${row[2]}</td><td class="num ${row[4]}">${row[3]}</td></tr>`).join('')}</tbody></table></div></div>
+            <div class="section"><div class="section-title"><h3>决策依据</h3></div><div class="decision-grid"><div class="decision"><h3>主要机会</h3><p>${p.opportunity}</p></div><div class="decision risk"><h3>主要风险</h3><p>${p.riskText}</p></div></div></div>
+          </section>
+        </div>`;
+    }
+
+    function filteredMerchants() {
+      const keyword = appState.merchantSearch.toLowerCase();
+      return merchants.filter(item => (appState.merchantGroup==='全部'||item.group===appState.merchantGroup) && (appState.merchantFloor==='全部'||item.floor===appState.merchantFloor) && (!keyword||`${item.name}${item.subtype}`.toLowerCase().includes(keyword)));
+    }
+    function merchantRows() {
+      const list = filteredMerchants();
+      if (!list.length) return `<tr><td colspan="9" class="empty">没有符合条件的商户</td></tr>`;
+      return list.map(item=>`<tr><td>${item.name}</td><td><span class="category-swatch ${groupClass(item.group)}"></span>${item.group}</td><td>${item.subtype}</td><td>${item.floor}</td><td class="num">${item.spend} 元</td><td class="num">${item.area} ㎡</td><td class="num">${item.daily}</td><td class="num">${money(item.revenue)} 万</td><td><span class="badge">${item.status}</span></td></tr>`).join('');
+    }
+    function renderMerchants() {
+      return `${pageHeader('merchants',`<button class="btn" id="export-merchants">${icon('download')}导出 CSV</button><a class="btn primary" href="#import">${icon('upload')}导入数据</a>`)}
+        <div class="grid four" style="margin-bottom:16px"><div class="metric-card"><div class="metric-label">餐饮</div><div class="metric-value">15 家</div><div class="metric-note">占比 60%</div></div><div class="metric-card"><div class="metric-label">饮品</div><div class="metric-value">5 家</div><div class="metric-note">占比 20%</div></div><div class="metric-card"><div class="metric-label">健身</div><div class="metric-value">3 家</div><div class="metric-note">占比 12%</div></div><div class="metric-card"><div class="metric-label">百货</div><div class="metric-value">2 家</div><div class="metric-note">占比 8%</div></div></div>
+        <section class="panel"><div class="toolbar"><label class="field search"><span class="field-label">搜索商户</span><span class="input-icon">${icon('search')}<input id="merchant-search" class="form-control" value="${appState.merchantSearch}" placeholder="名称或业态"></span></label><label class="field"><span class="field-label">大类</span><select id="merchant-group" class="form-select">${['全部','餐饮','饮品','健身','百货'].map(v=>`<option ${v===appState.merchantGroup?'selected':''}>${v}</option>`).join('')}</select></label><label class="field"><span class="field-label">楼层</span><select id="merchant-floor" class="form-select">${['全部','B1','1F','2F','3F','4F','5F'].map(v=>`<option ${v===appState.merchantFloor?'selected':''}>${v}</option>`).join('')}</select></label></div><div class="table-wrap"><table style="min-width:920px"><thead><tr><th>商户</th><th>大类</th><th>细分业态</th><th>楼层</th><th class="num">客单价</th><th class="num">面积</th><th class="num">日均客流</th><th class="num">月营收</th><th>状态</th></tr></thead><tbody id="merchant-tbody">${merchantRows()}</tbody></table></div><p class="panel-note" id="merchant-count" style="margin-top:12px">显示 ${filteredMerchants().length} / 25 家商户</p></section>`;
+    }
+
+    function renderAudience() {
+      return `${pageHeader('audience',`<select class="form-select" id="audience-period" style="width:140px"><option>近 30 天</option><option>近 90 天</option><option>本年度</option></select>`)}
+        <div class="grid four" style="margin-bottom:16px"><div class="metric-card"><div class="metric-label">楼内员工</div><div class="metric-value">6,280</div><div class="metric-note up">较上月 +3.2%</div></div><div class="metric-card"><div class="metric-label">白领客群占比</div><div class="metric-value">73%</div><div class="metric-note">核心招商客群</div></div><div class="metric-card"><div class="metric-label">平均年龄</div><div class="metric-value">31.6</div><div class="metric-note">25-35 岁占 58%</div></div><div class="metric-card"><div class="metric-label">月均商业消费</div><div class="metric-value">1,860 元</div><div class="metric-note up">较上月 +6.4%</div></div></div>
+        <div class="grid two"><section class="panel"><div class="panel-head"><h2>核心客群结构</h2><span class="panel-note">按消费人数</span></div><div class="segment-row"><span>企业白领</span><div class="track"><div class="fill" style="--value:73"></div></div><strong>73%</strong></div><div class="segment-row"><span>访客与客户</span><div class="track"><div class="fill" style="--value:14;background:var(--blue)"></div></div><strong>14%</strong></div><div class="segment-row"><span>周边居民</span><div class="track"><div class="fill" style="--value:8;background:var(--orange)"></div></div><strong>8%</strong></div><div class="segment-row"><span>物业与服务</span><div class="track"><div class="fill" style="--value:5;background:#8a5fa0"></div></div><strong>5%</strong></div></section>
+        <section class="panel"><div class="panel-head"><h2>消费时段分布</h2><span class="panel-note">工作日</span></div><div class="chart-shell"><svg class="chart" viewBox="0 0 640 220" role="img" aria-label="各时段消费人次柱状图"><line class="gridline" x1="52" y1="180" x2="620" y2="180"/><line class="gridline" x1="52" y1="120" x2="620" y2="120"/><line class="gridline" x1="52" y1="60" x2="620" y2="60"/><g fill="var(--brand)"><rect x="76" y="142" width="66" height="38" rx="3"/><rect x="182" y="48" width="66" height="132" rx="3"/><rect x="288" y="98" width="66" height="82" rx="3"/><rect x="394" y="72" width="66" height="108" rx="3"/><rect x="500" y="126" width="66" height="54" rx="3"/></g><g text-anchor="middle"><text x="109" y="201">早餐</text><text x="215" y="201">午餐</text><text x="321" y="201">下午茶</text><text x="427" y="201">晚间</text><text x="533" y="201">夜间</text><text x="109" y="135">12%</text><text x="215" y="41">42%</text><text x="321" y="91">21%</text><text x="427" y="65">18%</text><text x="533" y="119">7%</text></g></svg></div></section></div>
+        <section class="panel" style="margin-top:16px"><div class="panel-head"><h2>招商偏好信号</h2><span class="panel-note">基于问卷与消费记录</span></div><div class="table-wrap"><table><thead><tr><th>需求场景</th><th class="num">需求指数</th><th class="num">现有供给</th><th>判断</th></tr></thead><tbody><tr><td>工作日午餐</td><td class="num">94</td><td class="num">15 家</td><td><span class="badge warn">供给充分，需差异化</span></td></tr><tr><td>精品咖啡与下午茶</td><td class="num">88</td><td class="num">5 家</td><td><span class="badge">仍有增长空间</span></td></tr><tr><td>下班后运动</td><td class="num">84</td><td class="num">3 家</td><td><span class="badge">模式有互补机会</span></td></tr><tr><td>生活便利零售</td><td class="num">71</td><td class="num">2 家</td><td><span class="badge blue">可补充服务密度</span></td></tr></tbody></table></div></section>`;
+    }
+
+    function renderOperations() {
+      const factor = appState.operationPeriod==='本月' ? 1 : appState.operationPeriod==='上月' ? .94 : .91;
+      const total = merchants.reduce((sum,m)=>sum+m.revenue,0)*factor;
+      const rent = merchants.reduce((sum,m)=>sum+m.rent,0)*factor;
+      const top = [...merchants].sort((a,b)=>b.revenue-a.revenue).slice(0,8);
+      return `${pageHeader('operations',`<select id="operation-period" class="form-select" style="width:130px"><option ${appState.operationPeriod==='本月'?'selected':''}>本月</option><option ${appState.operationPeriod==='上月'?'selected':''}>上月</option><option ${appState.operationPeriod==='近90天'?'selected':''}>近90天</option></select><button class="btn" data-toast="经营月报已生成">${icon('file-down')}生成月报</button>`)}
+        <div class="grid four" style="margin-bottom:16px"><div class="metric-card"><div class="metric-label">商户总营收</div><div class="metric-value">${money(total)} 万</div><div class="metric-note up">环比 +5.8%</div></div><div class="metric-card"><div class="metric-label">租金收入</div><div class="metric-value">${money(rent)} 万</div><div class="metric-note up">收缴率 98.6%</div></div><div class="metric-card"><div class="metric-label">平均坪效</div><div class="metric-value">2,416 元</div><div class="metric-note">餐饮贡献最高</div></div><div class="metric-card"><div class="metric-label">商业空置率</div><div class="metric-value">8.2%</div><div class="metric-note warn">可招商面积 620 ㎡</div></div></div>
+        <div class="grid two"><section class="panel"><div class="panel-head"><h2>近 8 月营收趋势</h2><span class="panel-note">单位：万元</span></div><div class="chart-shell"><svg class="chart" viewBox="0 0 640 220" role="img" aria-label="近八个月营收趋势"><path class="area" d="M52 168 L128 151 L204 159 L280 126 L356 119 L432 92 L508 70 L584 48 L584 180 L52 180 Z"/><polyline class="line" points="52,168 128,151 204,159 280,126 356,119 432,92 508,70 584,48"/><g fill="var(--surface)" stroke="var(--brand)" stroke-width="3"><circle cx="52" cy="168" r="4"/><circle cx="128" cy="151" r="4"/><circle cx="204" cy="159" r="4"/><circle cx="280" cy="126" r="4"/><circle cx="356" cy="119" r="4"/><circle cx="432" cy="92" r="4"/><circle cx="508" cy="70" r="4"/><circle cx="584" cy="48" r="4"/></g><line class="gridline" x1="52" y1="180" x2="600" y2="180"/><g text-anchor="middle"><text x="52" y="202">1月</text><text x="128" y="202">2月</text><text x="204" y="202">3月</text><text x="280" y="202">4月</text><text x="356" y="202">5月</text><text x="432" y="202">6月</text><text x="508" y="202">7月</text><text x="584" y="202">8月</text></g></svg></div></section>
+        <section class="panel"><div class="panel-head"><h2>业态营收贡献</h2><span class="panel-note">本月</span></div>${['餐饮','饮品','健身','百货'].map(group=>{const val=merchants.filter(m=>m.group===group).reduce((s,m)=>s+m.revenue,0);return `<div class="segment-row"><span>${group}</span><div class="track"><div class="fill" style="--value:${val/total*100};background:${group==='饮品'?'var(--blue)':group==='健身'?'var(--orange)':group==='百货'?'#8a5fa0':'var(--brand)'}"></div></div><strong>${Math.round(val/total*100)}%</strong></div>`}).join('')}</section></div>
+        <section class="panel" style="margin-top:16px"><div class="panel-head"><h2>营收前八商户</h2><span class="panel-note">按月营收排序</span></div><div class="table-wrap"><table><thead><tr><th>排名</th><th>商户</th><th>业态</th><th class="num">月营收</th><th class="num">租金</th><th class="num">租售比</th></tr></thead><tbody>${top.map((m,i)=>`<tr><td>${i+1}</td><td>${m.name}</td><td>${m.group} · ${m.subtype}</td><td class="num">${money(m.revenue*factor)} 万</td><td class="num">${money(m.rent*factor)} 万</td><td class="num">${(m.rent/m.revenue*100).toFixed(1)}%</td></tr>`).join('')}</tbody></table></div></section>`;
+    }
+
+    function renderImport() {
+      return `${pageHeader('import',`<button class="btn" id="download-template">${icon('download')}下载 CSV 模板</button>`)}
+        <div class="grid two"><section class="panel"><div class="panel-head"><h2>上传经营数据</h2><span class="panel-note">CSV / XLSX</span></div><div class="dropzone"><div><i data-lucide="file-up" class="drop-icon" aria-hidden="true"></i><h3>选择商户数据文件</h3><p>支持商户名称、业态、客单价、面积、日均客流、月营收和租金字段</p><input id="data-file" type="file" accept=".csv,.xlsx,.xls"></div></div><div class="button-row"><button class="btn primary" id="import-button" disabled>${icon('database')}导入数据</button></div></section>
+        <section class="panel"><div class="panel-head"><h2>字段映射</h2><span class="badge blue">标准模板</span></div><div class="mapping-list">${[['商户名称','name'],['业态大类','group'],['客单价','spend'],['月营收','revenue'],['月租金','rent']].map(row=>`<div class="mapping-row"><input class="form-control" value="${row[0]}" readonly>${icon('arrow-right')}<select class="form-select"><option>${row[1]}</option></select></div>`).join('')}</div></section></div>
+        <section class="panel" style="margin-top:16px"><div class="panel-head"><h2>最近导入</h2><span class="panel-note">仅保留最近 90 天记录</span></div><div class="table-wrap"><table><thead><tr><th>文件</th><th>数据期间</th><th class="num">记录数</th><th>状态</th><th>导入时间</th></tr></thead><tbody id="import-history"><tr><td>merchant_operation_2026_07.csv</td><td>2026-07</td><td class="num">25</td><td><span class="badge">已完成</span></td><td>2026-08-03 09:42</td></tr><tr><td>tenant_base_data.xlsx</td><td>基础数据</td><td class="num">25</td><td><span class="badge">已完成</span></td><td>2026-07-28 15:16</td></tr></tbody></table></div></section>`;
+    }
+
+    function renderModel() {
+      const labels={customer:'客群匹配',complement:'业态互补',spend:'消费能力',time:'消费时段',competition:'竞争强度',rent:'租金承受'};
+      const total=Object.values(appState.weights).reduce((a,b)=>a+b,0);
+      return `${pageHeader('model',`<button class="btn" id="reset-model">${icon('rotate-ccw')}恢复默认</button><button class="btn primary" id="save-model" ${total!==100?'disabled':''}>${icon('save')}保存模型</button>`)}
+        <div class="grid two"><section class="panel"><div class="panel-head"><div><h2>评分权重</h2><p class="page-subtitle">六项指标合计必须为 100%</p></div><div><div class="model-total ${total!==100?'invalid':''}" id="model-total">${total}%</div><span class="panel-note">当前合计</span></div></div>${Object.entries(appState.weights).map(([key,val])=>`<label class="weight-row"><span>${labels[key]}</span><input type="range" min="0" max="40" value="${val}" data-weight="${key}"><span class="weight-value" id="weight-${key}">${val}%</span></label>`).join('')}</section>
+        <section class="panel"><div class="panel-head"><h2>决策阈值</h2><span class="panel-note">按总分判断</span></div><label class="field"><span class="field-label">优先引入</span><div class="inline"><input class="form-control" value="85" style="max-width:90px"><span>分及以上</span></div></label><label class="field"><span class="field-label">建议引入</span><div class="inline"><input class="form-control" value="75" style="max-width:90px"><span>至 84 分</span></div></label><label class="field"><span class="field-label">条件引入</span><div class="inline"><input class="form-control" value="65" style="max-width:90px"><span>至 74 分</span></div></label><label class="field"><span class="field-label">暂不引入</span><div class="inline"><input class="form-control" value="64" style="max-width:90px"><span>分及以下</span></div></label><div class="section"><div class="decision"><h3>当前模型版本</h3><p>招商适配模型 v1.3 · 最近更新于 2026-08-08</p></div></div></section></div>
+        <section class="panel" style="margin-top:16px"><div class="panel-head"><h2>评分预览</h2><span class="panel-note">使用当前权重重新计算</span></div><div class="table-wrap"><table><thead><tr><th>候选商户</th><th>业态</th><th class="num">当前得分</th><th>建议</th></tr></thead><tbody>${Object.values(candidates).map(p=>`<tr><td>${p.name}</td><td>${p.category}</td><td class="num">${p.score}</td><td><span class="badge">${p.verdict}</span></td></tr>`).join('')}</tbody></table></div></section>`;
+    }
+
+    function render() {
+      const current=route();
+      document.querySelectorAll('[data-route]').forEach(link=>link.classList.toggle('active',link.dataset.route===current));
+      const views={analysis:renderAnalysis,merchants:renderMerchants,audience:renderAudience,operations:renderOperations,import:renderImport,model:renderModel};
+      document.getElementById('main-content').innerHTML=views[current]();
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('overlay').classList.remove('open');
+      if(window.lucide) lucide.createIcons({attrs:{'stroke-width':1.8}});
+      window.scrollTo(0,0);
+    }
+
+    function showToast(message) {
+      const toast=document.getElementById('toast');
+      toast.textContent=message;
+      toast.classList.add('show');
+      clearTimeout(showToast.timer);
+      showToast.timer=setTimeout(()=>toast.classList.remove('show'),2200);
+    }
+    function openDrawer(type='history') {
+      const title=document.getElementById('drawer-title');
+      const content=document.getElementById('drawer-content');
+      if(type==='notifications') {
+        title.textContent='消息';
+        content.innerHTML='<div class="history-item"><h3>7 月经营数据已完成校验</h3><p>25 家商户数据均已进入分析基准。</p></div><div class="history-item"><h3>3 个铺位即将到期</h3><p>建议本周启动续租与替换品牌评估。</p></div>';
+      } else if(type==='account') {
+        title.textContent='账户';
+        content.innerHTML='<div class="history-item"><h3>环球中心 · 招商部</h3><p>角色：招商主管 · 数据范围：环球中心 A 座</p></div><button class="btn" style="margin-top:12px" data-toast="账户设置入口已就绪">账户设置</button>';
+      } else {
+        title.textContent='分析历史';
+        content.innerHTML=appState.history.map(item=>`<div class="history-item"><div class="inline" style="justify-content:space-between"><h3>${item.name}</h3><span class="badge">${item.score} · ${item.result}</span></div><p>${item.time}</p></div>`).join('');
+      }
+      document.getElementById('drawer-backdrop').classList.add('open');
+      if(window.lucide) lucide.createIcons({attrs:{'stroke-width':1.8}});
+    }
+    function closeDrawer() { document.getElementById('drawer-backdrop').classList.remove('open'); }
+
+    function download(name,content,type='text/csv;charset=utf-8') {
+      const blob=new Blob(['\ufeff'+content],{type});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download=name; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),500);
+    }
+    function exportMerchants() {
+      const header=['商户名称','业态大类','细分业态','楼层','客单价','面积','日均客流','月营收(万元)','月租金(万元)','状态'];
+      const rows=merchants.map(m=>[m.name,m.group,m.subtype,m.floor,m.spend,m.area,m.daily,m.revenue,m.rent,m.status]);
+      download('楼内商户模拟数据.csv',[header,...rows].map(row=>row.map(v=>`"${v}"`).join(',')).join('\n'));
+      showToast('已导出 25 家商户数据');
+    }
+
+    window.addEventListener('hashchange',render);
+    document.addEventListener('click',event=>{
+      const candidate=event.target.closest('[data-candidate]');
+      if(candidate){appState.candidate=candidate.dataset.candidate;render();return;}
+      if(event.target.closest('#menu-toggle')){document.getElementById('sidebar').classList.add('open');document.getElementById('overlay').classList.add('open');return;}
+      if(event.target.closest('#overlay')){document.getElementById('sidebar').classList.remove('open');event.target.classList.remove('open');return;}
+      if(event.target.closest('#history-button')||event.target.closest('[data-open-history]')){openDrawer();return;}
+      if(event.target.closest('#notification-button')){openDrawer('notifications');return;}
+      if(event.target.closest('#account-button')){openDrawer('account');return;}
+      if(event.target.closest('#drawer-close')||event.target===document.getElementById('drawer-backdrop')){closeDrawer();return;}
+      const toastTarget=event.target.closest('[data-toast]');
+      if(toastTarget){showToast(toastTarget.dataset.toast);return;}
+      if(event.target.closest('#export-merchants')){exportMerchants();return;}
+      if(event.target.closest('#download-template')){download('商户数据导入模板.csv','商户名称,业态大类,细分业态,楼层,客单价,面积,日均客流,月营收,月租金');showToast('模板已下载');return;}
+      if(event.target.closest('#analyze-button')){
+        const p=candidates[appState.candidate];
+        const typed=document.getElementById('candidate-name').value.trim()||p.name;
+        appState.history.unshift({name:typed,score:p.score,result:p.verdict,time:'刚刚'});
+        document.getElementById('result-name').textContent=typed;
+        showToast('招商分析已更新');return;
+      }
+      if(event.target.closest('#import-button')){
+        const file=document.getElementById('data-file').files[0];
+        if(!file)return;
+        document.getElementById('import-history').insertAdjacentHTML('afterbegin',`<tr><td>${file.name}</td><td>待识别</td><td class="num">25</td><td><span class="badge">已完成</span></td><td>刚刚</td></tr>`);
+        showToast('数据导入完成，分析基准已更新');return;
+      }
+      if(event.target.closest('#reset-model')){appState.weights={customer:26,complement:24,spend:16,time:12,competition:12,rent:10};render();showToast('已恢复默认权重');return;}
+      if(event.target.closest('#save-model')){showToast('评分模型已保存为 v1.4');return;}
+    });
+
+    document.addEventListener('input',event=>{
+      if(event.target.id==='merchant-search'){
+        appState.merchantSearch=event.target.value;
+        document.getElementById('merchant-tbody').innerHTML=merchantRows();
+        document.getElementById('merchant-count').textContent=`显示 ${filteredMerchants().length} / 25 家商户`;
+      }
+      if(event.target.matches('[data-weight]')){
+        appState.weights[event.target.dataset.weight]=Number(event.target.value);
+        document.getElementById(`weight-${event.target.dataset.weight}`).textContent=`${event.target.value}%`;
+        const total=Object.values(appState.weights).reduce((a,b)=>a+b,0);
+        const totalEl=document.getElementById('model-total');
+        totalEl.textContent=`${total}%`; totalEl.classList.toggle('invalid',total!==100);
+        document.getElementById('save-model').disabled=total!==100;
+      }
+    });
+    document.addEventListener('change',event=>{
+      if(event.target.id==='merchant-group'){appState.merchantGroup=event.target.value;document.getElementById('merchant-tbody').innerHTML=merchantRows();document.getElementById('merchant-count').textContent=`显示 ${filteredMerchants().length} / 25 家商户`;}
+      if(event.target.id==='merchant-floor'){appState.merchantFloor=event.target.value;document.getElementById('merchant-tbody').innerHTML=merchantRows();document.getElementById('merchant-count').textContent=`显示 ${filteredMerchants().length} / 25 家商户`;}
+      if(event.target.id==='operation-period'){appState.operationPeriod=event.target.value;render();}
+      if(event.target.id==='data-file'){const button=document.getElementById('import-button');button.disabled=!event.target.files.length;if(event.target.files.length)showToast(`已选择 ${event.target.files[0].name}`);}
+    });
+    document.addEventListener('keydown',event=>{if(event.key==='Escape')closeDrawer();});
+    render();
+  </script>
+</body>
+</html>
