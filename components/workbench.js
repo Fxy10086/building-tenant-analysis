@@ -90,7 +90,7 @@ const money = value => Number(value).toLocaleString('zh-CN',{maximumFractionDigi
 const groupClass = group => group==='饮品'?'drink':group==='健身'?'gym':group==='百货'?'retail':'';
 const BUILDING_ADDRESS = process.env.NEXT_PUBLIC_BUILDING_ADDRESS || '北京市海淀区中关村融科资讯中心';
 const hasAmapConfig = Boolean(process.env.NEXT_PUBLIC_AMAP_KEY && process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE);
-const amapTypes = {全部:'050000|060000|080100',餐饮:'050000',饮品:'050000',健身:'080100',零售:'060000'};
+const amapTypes = {全部:'050000',餐饮:'050000',饮品:'050000',健身:'080100',零售:'060000'};
 const inferPoiGroup = poi => {
   const text=`${poi.name}${poi.type}`;
   if(/^0801/.test(poi.typecode)||/健身|运动|瑜伽|游泳/.test(text)) return '健身';
@@ -161,7 +161,8 @@ export default function Workbench() {
     const controller=new AbortController();
     const timer=setTimeout(()=>{
       setAmapSearching(true);
-      const query=new URLSearchParams({action:'around',location:amapCenter.join(','),radius:String(compareRadius),keywords:compareSearch.trim(),types:amapTypes[compareGroup]||''});
+      const keyword=compareSearch.trim();
+      const query=new URLSearchParams({action:'around',location:amapCenter.join(','),radius:String(compareRadius),keywords:keyword,types:keyword&&compareGroup==='全部'?'':amapTypes[compareGroup]||''});
       fetch(`/api/amap?${query}`,{signal:controller.signal})
         .then(async response=>{const data=await response.json();if(!response.ok||!data.ok) throw new Error(data.message||'周边商户搜索失败');return data;})
         .then(data=>{
