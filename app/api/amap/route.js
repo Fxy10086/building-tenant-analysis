@@ -69,6 +69,8 @@ export async function GET(request) {
 
     const pois = (result.data.pois || []).map(poi => {
       const [lng, lat] = String(poi.location || '').split(',').map(Number);
+      const rating = typeof poi.biz_ext?.rating === 'string' && poi.biz_ext.rating ? poi.biz_ext.rating : null;
+      const cost = typeof poi.biz_ext?.cost === 'string' && poi.biz_ext.cost ? poi.biz_ext.cost : null;
       return {
         id: poi.id,
         name: poi.name,
@@ -78,8 +80,8 @@ export async function GET(request) {
         distance: Number(poi.distance) || 0,
         lng,
         lat,
-        rating: poi.biz_ext?.rating || null,
-        cost: poi.biz_ext?.cost || null
+        rating,
+        cost
       };
     }).filter(poi => poi.id && Number.isFinite(poi.lng) && Number.isFinite(poi.lat));
 
