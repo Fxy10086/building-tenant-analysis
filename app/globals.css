@@ -231,7 +231,14 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .search-result-actions, .table-actions { display: flex; align-items: center; gap: 7px; }
 .search-result-actions { flex-direction: column; align-items: stretch; }
 .search-result-actions .btn { white-space: nowrap; }
+.integration-notice { margin-top: 12px; padding: 10px 11px; border-left: 3px solid var(--orange); display: grid; gap: 3px; color: var(--muted); background: var(--orange-soft); font-size: 12px; }
+.integration-notice strong { color: var(--orange); }
 .geo-stage { min-height: 420px; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--soft); }
+.amap-stage { width: 100%; min-height: 420px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--soft); }
+.amap-building-marker, .amap-poi-marker { display: grid; place-items: center; border: 2px solid #fff; border-radius: 50%; color: #fff; box-shadow: 0 3px 10px rgba(22,39,45,.25); font-size: 12px; font-weight: 600; }
+.amap-building-marker { width: 36px; height: 36px; background: var(--text); }
+.amap-poi-marker { width: 32px; height: 32px; padding: 0; background: var(--blue); }
+.amap-poi-marker.selected { width: 36px; height: 36px; background: var(--brand); }
 .geo-axis-x, .geo-axis-y { position: absolute; background: var(--line); }
 .geo-axis-x { left: 7%; right: 7%; top: 50%; height: 1px; }
 .geo-axis-y { top: 7%; bottom: 7%; left: 50%; width: 1px; }
@@ -302,5 +309,6 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .signal-row { grid-template-columns: 1fr 68px 48px; gap: 7px; }
   .weight-row { grid-template-columns: 90px minmax(90px, 1fr) 46px; gap: 8px; }
   .geo-stage { min-height: 340px; }
+  .amap-stage { min-height: 340px; }
   .drawer-backdrop { padding: 66px 10px 10px; }
 }
