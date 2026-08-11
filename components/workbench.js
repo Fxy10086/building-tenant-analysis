@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import AmapMap from './amap-map';
 import {
   Bell, BookmarkCheck, BookmarkPlus, Building2, ChartNoAxesCombined, CircleCheck, ClipboardCheck,
   Columns3, Database, Download, FileDown, History, MapPinned, Menu,
@@ -87,6 +88,16 @@ const meta = {
 
 const money = value => Number(value).toLocaleString('zh-CN',{maximumFractionDigits:1});
 const groupClass = group => group==='饮品'?'drink':group==='健身'?'gym':group==='百货'?'retail':'';
+const BUILDING_ADDRESS = process.env.NEXT_PUBLIC_BUILDING_ADDRESS || '北京市海淀区中关村融科资讯中心';
+const hasAmapConfig = Boolean(process.env.NEXT_PUBLIC_AMAP_KEY && process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE);
+const amapTypes = {全部:'050000|060000|080100',餐饮:'050000',饮品:'050000',健身:'080100',零售:'060000'};
+const inferPoiGroup = poi => {
+  const text=`${poi.name}${poi.type}`;
+  if(/^0801/.test(poi.typecode)||/健身|运动|瑜伽|游泳/.test(text)) return '健身';
+  if(/咖啡|茶饮|饮品|甜品|烘焙|奶茶/.test(text)) return '饮品';
+  if(/^05/.test(poi.typecode)||/餐饮|餐厅|小吃|快餐/.test(text)) return '餐饮';
+  return '零售';
+};
 
 export default function Workbench() {
   const pathname = usePathname();
@@ -100,12 +111,18 @@ export default function Workbench() {
   const [analysisSearch,setAnalysisSearch] = useState('');
   const [shortlistSearch,setShortlistSearch] = useState('');
   const [savedCandidateKeys,setSavedCandidateKeys] = useState(['coffee','food','gym']);
+  const [savedPoiCandidates,setSavedPoiCandidates] = useState([]);
   const [shortlistReady,setShortlistReady] = useState(false);
   const [scenario,setScenario] = useState('base');
   const [compareSearch,setCompareSearch] = useState('');
   const [compareRadius,setCompareRadius] = useState(1000);
   const [compareGroup,setCompareGroup] = useState('全部');
   const [selected,setSelected] = useState(['ms-finance','hf-center','ss-river']);
+  const [amapMode,setAmapMode] = useState(hasAmapConfig?'connecting':'mock');
+  const [amapCenter,setAmapCenter] = useState(null);
+  const [liveLocations,setLiveLocations] = useState([]);
+  const [amapError,setAmapError] = useState('');
+  const [amapSearching,setAmapSearching] = useState(false);
   const [merchantSearch,setMerchantSearch] = useState('');
   const [merchantGroup,setMerchantGroup] = useState('全部');
   const [period,setPeriod] = useState('本月');
@@ -117,6 +134,8 @@ export default function Workbench() {
     try {
       const stored=JSON.parse(localStorage.getItem('merchant-fit-shortlist')||'null');
       if(Array.isArray(stored)) setSavedCandidateKeys(stored.filter(key=>candidates[key]));
+      const storedPois=JSON.parse(localStorage.getItem('merchant-fit-poi-shortlist')||'null');
+      if(Array.isArray(storedPois)) setSavedPoiCandidates(storedPois);
       const active=localStorage.getItem('merchant-fit-active-candidate');
       if(candidates[active]) setCandidateKey(active);
     } catch {}
@@ -125,6 +144,36 @@ export default function Workbench() {
   useEffect(()=>{
     if(shortlistReady) localStorage.setItem('merchant-fit-shortlist',JSON.stringify(savedCandidateKeys));
   },[savedCandidateKeys,shortlistReady]);
+  useEffect(()=>{
+    if(shortlistReady) localStorage.setItem('merchant-fit-poi-shortlist',JSON.stringify(savedPoiCandidates));
+  },[savedPoiCandidates,shortlistReady]);
+  useEffect(()=>{
+    if(!hasAmapConfig) return;
+    const controller=new AbortController();
+    fetch(`/api/amap?action=geocode&address=${encodeURIComponent(BUILDING_ADDRESS)}`,{signal:controller.signal})
+      .then(async response=>{const data=await response.json();if(!response.ok||!data.ok) throw new Error(data.message||'写字楼定位失败');return data;})
+      .then(data=>{setAmapCenter([data.building.lng,data.building.lat]);setAmapMode('live');setSelected([]);})
+      .catch(error=>{if(error.name!=='AbortError'){setAmapError(error.message);setAmapMode('mock');}});
+    return ()=>controller.abort();
+  },[]);
+  useEffect(()=>{
+    if(amapMode!=='live'||!amapCenter) return;
+    const controller=new AbortController();
+    const timer=setTimeout(()=>{
+      setAmapSearching(true);
+      const query=new URLSearchParams({action:'around',location:amapCenter.join(','),radius:String(compareRadius),keywords:compareSearch.trim(),types:amapTypes[compareGroup]||''});
+      fetch(`/api/amap?${query}`,{signal:controller.signal})
+        .then(async response=>{const data=await response.json();if(!response.ok||!data.ok) throw new Error(data.message||'周边商户搜索失败');return data;})
+        .then(data=>{
+          const items=data.pois.map(poi=>({id:`amap-${poi.id}`,key:null,merchant:poi.name,branch:'高德门店',group:inferPoiGroup(poi),address:poi.address,distance:poi.distance,rating:poi.rating||'暂无',sales:poi.cost?`人均 ${poi.cost} 元`:'真实 POI',x:null,y:null,poiId:poi.id,lng:poi.lng,lat:poi.lat}));
+          setLiveLocations(compareGroup==='全部'?items:items.filter(item=>item.group===compareGroup));
+          setAmapError('');
+        })
+        .catch(error=>{if(error.name!=='AbortError'){setAmapError(error.message);setLiveLocations([]);}})
+        .finally(()=>setAmapSearching(false));
+    },450);
+    return ()=>{clearTimeout(timer);controller.abort();};
+  },[amapCenter,amapMode,compareGroup,compareRadius,compareSearch]);
   const notify = message => {
     setToast(message);
     clearTimeout(toastTimer.current);
@@ -142,6 +191,18 @@ export default function Workbench() {
   const removeCandidate = key => {
     setSavedCandidateKeys(current=>current.filter(item=>item!==key));
     notify(`${candidates[key].name} 已移出候选商户库`);
+  };
+  const isLocationSaved = item => item.key ? savedCandidateKeys.includes(item.key) : savedPoiCandidates.some(poi=>poi.poiId===item.poiId);
+  const saveLocationCandidate = item => {
+    if(item.key) return saveCandidate(item.key);
+    if(isLocationSaved(item)) return notify(`${item.merchant} 已在候选商户库中`);
+    setSavedPoiCandidates(current=>[...current,{...item,source:'高德地图',stage:'待补充资料',owner:'待分配',next:'补充面积、租金与品牌联系人'}]);
+    notify(`${item.merchant} 已加入候选商户库`);
+  };
+  const removePoiCandidate = poiId => {
+    const item=savedPoiCandidates.find(poi=>poi.poiId===poiId);
+    setSavedPoiCandidates(current=>current.filter(poi=>poi.poiId!==poiId));
+    notify(`${item?.merchant||'商户'} 已移出候选商户库`);
   };
 
   const header = (actions=null) => <div className="page-head"><div><h1>{meta[page][0]}</h1><p className="page-subtitle">{meta[page][1]}</p></div>{actions&&<div className="page-actions">{actions}</div>}</div>;
@@ -171,32 +232,37 @@ export default function Workbench() {
         <section className="panel"><div className="panel-head"><h2>可信度与铺位建议</h2><span className="panel-note">模拟数据校验</span></div><Confidence label="模型可信度" value={bc.confidence}/><Confidence label="数据完整度" value={bc.completeness} blue/><div className="section"><div className="section-title"><h3>推荐铺位</h3><Link href="/units" className="panel-note">查看全部</Link></div><div className="signal-list">{top.map(unit=><div className="signal-row" key={unit.code}><span><b className="unit-code">{unit.code}</b> · {unit.floor} · {unit.area}㎡</span><span>{unit.rent} 万/月</span><strong>{unit.fit[candidateKey]}分</strong></div>)}</div></div><div className="section"><div className="decision-grid"><div className="decision risk"><h3>预计分流</h3><p>对楼内同业营业额影响约 {bc.cannibalization}%</p></div><div className="decision"><h3>周边竞争</h3><p>500 米内同类品牌 {bc.nearby} 家</p></div></div></div></section></div></>;
   }
 
-  const searchResults = useMemo(()=>{
+  const mockSearchResults = useMemo(()=>{
     const keyword=compareSearch.trim().toLowerCase();
     return locations.filter(item=>item.distance<=compareRadius&&(compareGroup==='全部'||item.group===compareGroup)&&(!keyword||`${item.merchant}${item.branch}${item.address}`.toLowerCase().includes(keyword)));
   },[compareSearch,compareRadius,compareGroup]);
-  const selectedLocations=selected.map(id=>locations.find(item=>item.id===id)).filter(Boolean);
+  const activeLocations=amapMode==='live'?liveLocations:locations;
+  const searchResults=amapMode==='live'?liveLocations:mockSearchResults;
+  const selectedLocations=selected.map(id=>activeLocations.find(item=>item.id===id)).filter(Boolean);
   const toggleLocation=id=>setSelected(current=>current.includes(id)?current.filter(item=>item!==id):current.length>=3?(notify('最多选择 3 家候选门店'),current):[...current,id]);
 
   function ComparePage(){
-    return <>{header(<><span className="badge blue">定位数据：模拟</span><button className="btn" onClick={()=>notify('候选对比报告已生成')}><FileDown size={16}/>生成报告</button></>)}
+    const liveMap=amapMode==='live'&&amapCenter;
+    return <>{header(<><span className={`badge ${liveMap?'':'blue'}`}>{liveMap?'高德实时数据':amapMode==='connecting'?'高德连接中':'模拟数据'}</span><button className="btn" onClick={()=>notify('候选对比报告已生成')}><FileDown size={16}/>生成报告</button></>)}
       <div className="merchant-locator"><section className="panel"><div className="panel-head"><div><h2>搜索周边商户</h2><p className="page-subtitle">可收藏品牌，也可选择门店直接比较</p></div><span className="panel-note">最多对比 3 家</span></div>
         <label className="field" style={{marginTop:0}}><span className="field-label">关键词</span><span className="input-icon"><Search size={16}/><input id="compare-search" className="form-control" value={compareSearch} onChange={e=>setCompareSearch(e.target.value)} placeholder="例如：M Stand、金融中心店"/></span></label>
-        <div className="form-row"><label className="field"><span className="field-label">业态</span><select className="form-select" value={compareGroup} onChange={e=>setCompareGroup(e.target.value)}>{['全部','餐饮','饮品','健身'].map(v=><option key={v}>{v}</option>)}</select></label><label className="field"><span className="field-label">搜索半径</span><select className="form-select" value={compareRadius} onChange={e=>setCompareRadius(Number(e.target.value))}><option value="500">500 米</option><option value="1000">1 公里</option><option value="2000">2 公里</option></select></label></div>
-        <div className="section"><div className="section-title"><h3>搜索结果</h3><span className="panel-note">{searchResults.length} 家门店</span></div><div className="search-result-list">{searchResults.length?searchResults.map(item=><div className="search-result" key={item.id}><div><h3>{item.merchant} · {item.branch}</h3><p>{item.address}</p><div className="search-meta"><span>{item.group}</span><span>{item.distance}m</span><span>评分 {item.rating}</span><span>销售指数 {item.sales}</span></div></div><div className="search-result-actions"><button className={`btn ${selected.includes(item.id)?'danger':''}`} onClick={()=>toggleLocation(item.id)}>{selected.includes(item.id)?'移出对比':'加入对比'}</button><button className={`btn ${savedCandidateKeys.includes(item.key)?'saved':''}`} onClick={()=>saveCandidate(item.key)} disabled={savedCandidateKeys.includes(item.key)}>{savedCandidateKeys.includes(item.key)?<CircleCheck size={15}/>:<BookmarkPlus size={15}/>} {savedCandidateKeys.includes(item.key)?'已在候选库':'加入候选'}</button></div></div>):<div className="empty">当前条件下没有匹配门店</div>}</div></div></section>
-        <section className="panel"><div className="panel-head"><div><h2>楼宇周边相对位置</h2><p className="page-subtitle">高德 Key 配置后替换为真实地图</p></div><span className="panel-note">半径 {compareRadius>=1000?`${compareRadius/1000}km`:`${compareRadius}m`}</span></div><div className="geo-stage"><div className="geo-axis-x"/><div className="geo-axis-y"/><div className="geo-ring r1"/><div className="geo-ring r2"/><div className="geo-ring r3"/><div className="geo-center"><Building2 size={17}/></div>{locations.map(item=><button key={item.id} className={`geo-point ${selected.includes(item.id)?'selected':''} ${item.distance>compareRadius?'outside':''}`} style={{left:`${item.x}%`,top:`${item.y}%`}} onClick={()=>toggleLocation(item.id)} aria-label={`${item.merchant}${item.branch}，${item.distance}米`}>{item.group==='饮品'?'咖':item.key==='food'?'餐':'健'}</button>)}<div className="geo-legend">中心：目标楼宇 · 绿色：已选 · 淡色：半径外</div></div>
+        <div className="form-row"><label className="field"><span className="field-label">业态</span><select className="form-select" value={compareGroup} onChange={e=>setCompareGroup(e.target.value)}>{['全部','餐饮','饮品','健身','零售'].map(v=><option key={v}>{v}</option>)}</select></label><label className="field"><span className="field-label">搜索半径</span><select className="form-select" value={compareRadius} onChange={e=>setCompareRadius(Number(e.target.value))}><option value="500">500 米</option><option value="1000">1 公里</option><option value="2000">2 公里</option></select></label></div>
+        {amapError&&<div className="integration-notice"><strong>高德连接提示</strong><span>{amapError}，当前仍可使用模拟数据。</span></div>}
+        <div className="section"><div className="section-title"><h3>搜索结果</h3><span className="panel-note">{amapSearching?'搜索中…':`${searchResults.length} 家门店`}</span></div><div className="search-result-list">{searchResults.length?searchResults.map(item=><div className="search-result" key={item.id}><div><h3>{item.merchant}{item.branch&&` · ${item.branch}`}</h3><p>{item.address}</p><div className="search-meta"><span>{item.group}</span><span>{item.distance}m</span><span>评分 {item.rating}</span><span>{item.sales}</span></div></div><div className="search-result-actions"><button className={`btn ${selected.includes(item.id)?'danger':''}`} onClick={()=>toggleLocation(item.id)}>{selected.includes(item.id)?'移出对比':'加入对比'}</button><button className={`btn ${isLocationSaved(item)?'saved':''}`} onClick={()=>saveLocationCandidate(item)} disabled={isLocationSaved(item)}>{isLocationSaved(item)?<CircleCheck size={15}/>:<BookmarkPlus size={15}/>} {isLocationSaved(item)?'已在候选库':'加入候选'}</button></div></div>):<div className="empty">{amapSearching?'正在搜索融科资讯中心周边商户':'当前条件下没有匹配门店'}</div>}</div></div></section>
+        <section className="panel"><div className="panel-head"><div><h2>融科资讯中心周边位置</h2><p className="page-subtitle">{liveMap?'高德地图实时 POI':'高德配置完成后自动切换真实地图'}</p></div><span className="panel-note">半径 {compareRadius>=1000?`${compareRadius/1000}km`:`${compareRadius}m`}</span></div>{liveMap?<AmapMap center={amapCenter} pois={liveLocations} selectedIds={selected} radius={compareRadius} onToggle={toggleLocation} onError={setAmapError}/>:<div className="geo-stage"><div className="geo-axis-x"/><div className="geo-axis-y"/><div className="geo-ring r1"/><div className="geo-ring r2"/><div className="geo-ring r3"/><div className="geo-center"><Building2 size={17}/></div>{locations.map(item=><button key={item.id} className={`geo-point ${selected.includes(item.id)?'selected':''} ${item.distance>compareRadius?'outside':''}`} style={{left:`${item.x}%`,top:`${item.y}%`}} onClick={()=>toggleLocation(item.id)} aria-label={`${item.merchant}${item.branch}，${item.distance}米`}>{item.group==='饮品'?'咖':item.key==='food'?'餐':'健'}</button>)}<div className="geo-legend">中心：融科资讯中心 · 绿色：已选 · 当前为模拟位置</div></div>}
         <div className="section"><div className="section-title"><h3>已选门店</h3><span className="panel-note">{selected.length}/3</span></div><div className="selected-strip">{selectedLocations.map(item=><span className="selected-item" key={item.id}>{item.merchant} · {item.branch}<button className="icon-btn" style={{width:24,minHeight:24}} onClick={()=>toggleLocation(item.id)} aria-label={`移出${item.merchant}`}><X size={13}/></button></span>)}</div></div></section></div>
-      <section className="panel" style={{marginTop:16}}><div className="panel-head"><h2>已选门店横向比较</h2><span className="panel-note">基准经营情景</span></div><div className="table-wrap"><table style={{minWidth:1080}}><thead><tr><th>候选门店</th><th>位置</th><th className="num">距离</th><th className="num">得分</th><th className="num">可信度</th><th className="num">预计营收</th><th className="num">租售比</th><th>推荐铺位</th><th>操作</th></tr></thead><tbody>{selectedLocations.map(item=>{const p=candidates[item.key],bc=businessCases[item.key],unit=bestUnits(item.key)[0];return <tr key={item.id}><td><b>{item.merchant}</b><br/><span className="panel-note">{item.branch}</span></td><td>{item.address}</td><td className="num">{item.distance}m</td><td className="num">{p.score}</td><td className="num">{bc.confidence}%</td><td className="num">{bc.revenue.base}万</td><td className="num">{(bc.rent/bc.revenue.base*100).toFixed(1)}%</td><td><b className="unit-code">{unit.code}</b> · {unit.fit[item.key]}分</td><td><Link href="/analysis" className="btn" onClick={()=>selectCandidate(item.key)}>详细测算</Link></td></tr>})}</tbody></table></div></section></>;
+      <section className="panel" style={{marginTop:16}}><div className="panel-head"><h2>已选门店横向比较</h2><span className="panel-note">高德位置数据 + 招商参数</span></div><div className="table-wrap"><table style={{minWidth:1080}}><thead><tr><th>候选门店</th><th>位置</th><th className="num">距离</th><th className="num">得分</th><th className="num">可信度</th><th className="num">预计营收</th><th className="num">租售比</th><th>推荐铺位</th><th>操作</th></tr></thead><tbody>{selectedLocations.map(item=>{const p=item.key?candidates[item.key]:null,bc=item.key?businessCases[item.key]:null,unit=item.key?bestUnits(item.key)[0]:null;return <tr key={item.id}><td><b>{item.merchant}</b><br/><span className="panel-note">{item.branch}</span></td><td>{item.address}</td><td className="num">{item.distance}m</td><td className="num">{p?.score??'待评估'}</td><td className="num">{bc?`${bc.confidence}%`:'—'}</td><td className="num">{bc?`${bc.revenue.base}万`:'—'}</td><td className="num">{bc?`${(bc.rent/bc.revenue.base*100).toFixed(1)}%`:'—'}</td><td>{unit?<><b className="unit-code">{unit.code}</b> · {unit.fit[item.key]}分</>:'补充经营参数后匹配'}</td><td>{p?<Link href="/analysis" className="btn" onClick={()=>selectCandidate(item.key)}>详细测算</Link>:<button className="btn" onClick={()=>saveLocationCandidate(item)}>{isLocationSaved(item)?'已加入候选':'加入候选'}</button>}</td></tr>})}</tbody></table></div></section></>;
   }
 
   function ShortlistPage(){
     const shortlistItems=savedCandidateKeys.filter(key=>candidates[key].name.toLowerCase().includes(shortlistSearch.trim().toLowerCase()));
+    const poiShortlistItems=savedPoiCandidates.filter(item=>`${item.merchant}${item.address}`.toLowerCase().includes(shortlistSearch.trim().toLowerCase()));
     const highPriority=savedCandidateKeys.filter(key=>candidates[key].score>=85).length;
     return <>{header(<Link href="/compare" className="btn primary"><Search size={16}/>搜索并添加商户</Link>)}
-      <div className="grid three" style={{marginBottom:16}}><MetricCard label="候选品牌" value={`${savedCandidateKeys.length} 家`} note="由招商团队维护"/><MetricCard label="优先推进" value={`${highPriority} 家`} note="适配分不低于 85"/><MetricCard label="待补充资料" value={`${savedCandidateKeys.filter(key=>businessCases[key].completeness<80).length} 家`} note="需要继续尽调" warn/></div>
+      <div className="grid three" style={{marginBottom:16}}><MetricCard label="候选品牌" value={`${savedCandidateKeys.length+savedPoiCandidates.length} 家`} note="由招商团队维护"/><MetricCard label="优先推进" value={`${highPriority} 家`} note="适配分不低于 85"/><MetricCard label="待补充资料" value={`${savedCandidateKeys.filter(key=>businessCases[key].completeness<80).length+savedPoiCandidates.length} 家`} note="需要继续尽调" warn/></div>
       <section className="panel"><div className="toolbar"><label className="field search"><span className="field-label">搜索候选品牌</span><span className="input-icon"><Search size={16}/><input className="form-control" value={shortlistSearch} onChange={e=>setShortlistSearch(e.target.value)} placeholder="品牌名称"/></span></label></div>
-        <div className="table-wrap"><table style={{minWidth:1040}}><thead><tr><th>候选品牌</th><th>业态</th><th>来源</th><th className="num">周边门店</th><th className="num">适配分</th><th>招商阶段</th><th>负责人</th><th>下一步</th><th>操作</th></tr></thead><tbody>{shortlistItems.map(key=>{const item=candidates[key],workflow=candidateWorkflow[key],branchCount=locations.filter(location=>location.key===key).length;return <tr key={key}><td><b>{item.name}</b><br/><span className="panel-note">{item.category}</span></td><td><span className={`category-swatch ${groupClass(item.group)}`}/>{item.group}</td><td>{workflow.source}</td><td className="num">{branchCount} 家</td><td className="num"><b className="unit-code">{item.score}</b></td><td><span className={`badge ${workflow.stage==='商务谈判'?'warn':workflow.stage==='初步筛选'?'blue':''}`}>{workflow.stage}</span></td><td>{workflow.owner}</td><td>{workflow.next}</td><td><div className="table-actions"><Link href="/analysis" className="btn" onClick={()=>selectCandidate(key)}><Sparkles size={15}/>分析</Link><button className="icon-btn danger" onClick={()=>removeCandidate(key)} aria-label={`移出${item.name}`} title="移出候选库"><X size={15}/></button></div></td></tr>})}</tbody></table></div>
-        {!shortlistItems.length&&<div className="empty"><BookmarkPlus size={28}/><p>候选库中没有匹配品牌</p><Link href="/compare" className="btn" style={{marginTop:12}}>搜索周边商户</Link></div>}
+        <div className="table-wrap"><table style={{minWidth:1040}}><thead><tr><th>候选品牌</th><th>业态</th><th>来源</th><th className="num">周边门店</th><th className="num">适配分</th><th>招商阶段</th><th>负责人</th><th>下一步</th><th>操作</th></tr></thead><tbody>{shortlistItems.map(key=>{const item=candidates[key],workflow=candidateWorkflow[key],branchCount=locations.filter(location=>location.key===key).length;return <tr key={key}><td><b>{item.name}</b><br/><span className="panel-note">{item.category}</span></td><td><span className={`category-swatch ${groupClass(item.group)}`}/>{item.group}</td><td>{workflow.source}</td><td className="num">{branchCount} 家</td><td className="num"><b className="unit-code">{item.score}</b></td><td><span className={`badge ${workflow.stage==='商务谈判'?'warn':workflow.stage==='初步筛选'?'blue':''}`}>{workflow.stage}</span></td><td>{workflow.owner}</td><td>{workflow.next}</td><td><div className="table-actions"><Link href="/analysis" className="btn" onClick={()=>selectCandidate(key)}><Sparkles size={15}/>分析</Link><button className="icon-btn danger" onClick={()=>removeCandidate(key)} aria-label={`移出${item.name}`} title="移出候选库"><X size={15}/></button></div></td></tr>})}{poiShortlistItems.map(item=><tr key={item.poiId}><td><b>{item.merchant}</b><br/><span className="panel-note">{item.address}</span></td><td><span className={`category-swatch ${groupClass(item.group)}`}/>{item.group}</td><td>高德地图</td><td className="num">1 家</td><td className="num"><span className="panel-note">待评估</span></td><td><span className="badge blue">待补充资料</span></td><td>{item.owner}</td><td>{item.next}</td><td><div className="table-actions"><button className="btn" onClick={()=>notify(`${item.merchant} 的资料补充入口已打开`)}><Plus size={15}/>补资料</button><button className="icon-btn danger" onClick={()=>removePoiCandidate(item.poiId)} aria-label={`移出${item.merchant}`} title="移出候选库"><X size={15}/></button></div></td></tr>)}</tbody></table></div>
+        {!shortlistItems.length&&!poiShortlistItems.length&&<div className="empty"><BookmarkPlus size={28}/><p>候选库中没有匹配品牌</p><Link href="/compare" className="btn" style={{marginTop:12}}>搜索周边商户</Link></div>}
       </section></>;
   }
 
@@ -216,7 +282,7 @@ export default function Workbench() {
   function ModelPage(){const labels={customer:'客群匹配',complement:'业态互补',spend:'消费能力',time:'消费时段',competition:'竞争强度',rent:'租金承受'},total=Object.values(weights).reduce((a,b)=>a+b,0);return <>{header(<><button className="btn" onClick={()=>setWeights({customer:26,complement:24,spend:16,time:12,competition:12,rent:10})}><RotateCcw size={16}/>恢复默认</button><button className="btn primary" disabled={total!==100} onClick={()=>notify('评分模型已保存')}><Save size={16}/>保存模型</button></>)}<div className="grid two"><section className="panel"><div className="panel-head"><div><h2>评分权重</h2><p className="page-subtitle">六项指标合计必须为100%</p></div><div><div className="model-total">{total}%</div><span className="panel-note">当前合计</span></div></div>{Object.entries(weights).map(([key,value])=><label className="weight-row" key={key}><span>{labels[key]}</span><input type="range" min="0" max="40" value={value} onChange={e=>setWeights({...weights,[key]:Number(e.target.value)})}/><span className="weight-value">{value}%</span></label>)}</section><section className="panel"><div className="panel-head"><h2>历史回测</h2><span className="badge blue">模拟样本</span></div><div className="grid three"><Metric label="样本数量" value="42" note="近24个月"/><Metric label="建议准确率" value="76%" note="较v1.2 +5pt"/><Metric label="平均误差" value="8.4分" note="目标低于7分"/></div><div className="section"><div className="decision risk"><h3>人工复核边界</h3><p>低样本业态、工程条件异常或租售比超过15%时必须进入人工审批。</p></div></div></section></div></>}
 
   const pages={analysis:<AnalysisPage/>,compare:<ComparePage/>,shortlist:<ShortlistPage/>,merchants:<MerchantsPage/>,units:<UnitsPage/>,audience:<AudiencePage/>,operations:<OperationsPage/>,decisions:<DecisionsPage/>,import:<ImportPage/>,model:<ModelPage/>};
-  return <div className="app-shell"><aside className={`sidebar ${mobileOpen?'open':''}`}><Link className="brand" href="/analysis"><span className="brand-mark"><Building2 size={18}/></span><span>楼宇招商分析台</span></Link><nav className="nav" aria-label="主导航">{navGroups.map(group=><div key={group.label}><div className="nav-label">{group.label}</div>{group.items.map(([key,label,Icon])=><Link className={`nav-link ${page===key?'active':''}`} href={`/${key}`} key={key}><Icon size={17}/>{label}</Link>)}</div>)}</nav><div className="sidebar-foot">Next.js 决策沙盒 · 模拟数据</div></aside><div className={`mobile-overlay ${mobileOpen?'open':''}`} onClick={()=>setMobileOpen(false)}/><section className="workspace"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)} aria-label="打开导航"><Menu size={18}/></button><span className="building">环球中心 A 座 · 招商部</span></div><div className="topbar-actions"><span className="badge blue hide-mobile">Next.js</span><button className="btn hide-mobile" onClick={()=>setDrawer('history')}><History size={16}/>分析历史</button><button className="icon-btn" onClick={()=>setDrawer('notifications')} aria-label="消息"><Bell size={17}/></button><button className="icon-btn" onClick={()=>setDrawer('account')} aria-label="账户"><UserRound size={17}/></button></div></header><main className="main">{pages[page]}</main></section>{drawer&&<Drawer type={drawer} onClose={()=>setDrawer(null)}/>} {toast&&<div className="toast" role="status">{toast}</div>}</div>;
+  return <div className="app-shell"><aside className={`sidebar ${mobileOpen?'open':''}`}><Link className="brand" href="/analysis"><span className="brand-mark"><Building2 size={18}/></span><span>楼宇招商分析台</span></Link><nav className="nav" aria-label="主导航">{navGroups.map(group=><div key={group.label}><div className="nav-label">{group.label}</div>{group.items.map(([key,label,Icon])=><Link className={`nav-link ${page===key?'active':''}`} href={`/${key}`} key={key}><Icon size={17}/>{label}</Link>)}</div>)}</nav><div className="sidebar-foot">Next.js 决策平台 · 高德地图预留</div></aside><div className={`mobile-overlay ${mobileOpen?'open':''}`} onClick={()=>setMobileOpen(false)}/><section className="workspace"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)} aria-label="打开导航"><Menu size={18}/></button><span className="building">中关村融科资讯中心 · 招商部</span></div><div className="topbar-actions"><span className="badge blue hide-mobile">Next.js</span><button className="btn hide-mobile" onClick={()=>setDrawer('history')}><History size={16}/>分析历史</button><button className="icon-btn" onClick={()=>setDrawer('notifications')} aria-label="消息"><Bell size={17}/></button><button className="icon-btn" onClick={()=>setDrawer('account')} aria-label="账户"><UserRound size={17}/></button></div></header><main className="main">{pages[page]}</main></section>{drawer&&<Drawer type={drawer} onClose={()=>setDrawer(null)}/>} {toast&&<div className="toast" role="status">{toast}</div>}</div>;
 }
 
 function Metric({label,value,note,warn}){return <div><span className="metric-label">{label}</span><div className="metric-value">{value}</div>{note&&<div className={`metric-note ${warn?'warn':''}`}>{note}</div>}</div>}
