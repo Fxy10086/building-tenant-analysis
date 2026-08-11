@@ -52,7 +52,7 @@ export async function GET(request) {
     if (!/^\d{2,3}\.\d+,-?\d{2}\.\d+$/.test(location || '')) {
       return errorResponse('缺少有效的中心坐标');
     }
-    const radius = Math.min(5000, Math.max(100, Number(params.get('radius')) || 1000));
+    const radius = Math.min(10000, Math.max(100, Number(params.get('radius')) || 1000));
     const result = await amapRequest('/v3/place/around', {
       location,
       radius,
