@@ -7,6 +7,12 @@ function errorResponse(message, status = 400) {
   return NextResponse.json({ ok: false, message }, { status });
 }
 
+function isInsideTargetBuilding(poi) {
+  if (poi.distance > 250) return false;
+  const text = `${poi.name}${poi.address}`;
+  return /融科(?:资讯|咨询|天地|中心)/.test(text) || /科学院?南路[2二]号/.test(text);
+}
+
 async function amapRequest(path, params) {
   const key = process.env.AMAP_WEB_SERVICE_KEY;
   if (!key) return { error: '高德 Web 服务 Key 尚未配置', status: 503 };
@@ -83,7 +89,9 @@ export async function GET(request) {
         rating,
         cost
       };
-    }).filter(poi => poi.id && Number.isFinite(poi.lng) && Number.isFinite(poi.lat));
+    })
+      .filter(poi => poi.id && Number.isFinite(poi.lng) && Number.isFinite(poi.lat))
+      .filter(poi => !isInsideTargetBuilding(poi));
 
     return NextResponse.json({ ok: true, pois });
   }
