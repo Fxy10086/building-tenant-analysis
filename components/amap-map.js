@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 
 let loaderPromise;
 
+const zoomForRadius = radius => radius <= 500 ? 16 : radius <= 1000 ? 15 : radius <= 2000 ? 14 : radius <= 5000 ? 12 : 11;
+
 function loadAmap() {
   const key = process.env.NEXT_PUBLIC_AMAP_KEY;
   const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE;
@@ -34,7 +36,7 @@ export default function AmapMap({ center, pois, selectedIds, radius, onToggle, o
       if (cancelled || !containerRef.current) return;
       mapRef.current = new AMap.Map(containerRef.current, {
         center,
-        zoom: radius <= 500 ? 16 : radius <= 1000 ? 15 : 14,
+        zoom: zoomForRadius(radius),
         resizeEnable: true,
         viewMode: '2D'
       });
@@ -53,7 +55,7 @@ export default function AmapMap({ center, pois, selectedIds, radius, onToggle, o
     const map = mapRef.current;
     map.clearMap();
     map.setCenter(center);
-    map.setZoom(radius <= 500 ? 16 : radius <= 1000 ? 15 : 14);
+    map.setZoom(zoomForRadius(radius));
 
     const centerNode = document.createElement('div');
     centerNode.className = 'amap-building-marker';
