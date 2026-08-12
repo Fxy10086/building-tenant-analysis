@@ -231,6 +231,8 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .search-result-actions, .table-actions { display: flex; align-items: center; gap: 7px; }
 .search-result-actions { flex-direction: column; align-items: stretch; }
 .search-result-actions .btn { white-space: nowrap; }
+.pagination { min-height: 48px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; }
+.pagination .btn { min-width: 76px; justify-content: center; }
 .integration-notice { margin-top: 12px; padding: 10px 11px; border-left: 3px solid var(--orange); display: grid; gap: 3px; color: var(--muted); background: var(--orange-soft); font-size: 12px; }
 .integration-notice strong { color: var(--orange); }
 .geo-stage { min-height: 420px; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--soft); }
@@ -302,6 +304,8 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .form-row, .decision-grid { grid-template-columns: 1fr; }
   .search-result { grid-template-columns: 1fr; }
   .search-result-actions { flex-direction: row; flex-wrap: wrap; }
+  .pagination { flex-wrap: wrap; justify-content: center; }
+  .pagination span { width: 100%; order: -1; text-align: center; }
   .result-head { display: block; }
   .result-head > .panel-note { display: block; margin-top: 10px; }
   .score-ring { width: 66px; }
