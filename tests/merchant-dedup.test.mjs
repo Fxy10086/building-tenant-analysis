@@ -21,6 +21,17 @@ test('filters the same tenant by normalized brand name', () => {
   assert.deepEqual(filterOutExistingTenants(candidates, tenants).map(item => item.id), ['3']);
 });
 
+test('filters brand matches with shopping-center and branch suffixes', () => {
+  const tenants = [{ name: '星巴克', status: '在营' }];
+  const candidates = [
+    { id: '1', name: '星巴克北京鼎好店' },
+    { id: '2', name: '星巴克臻选北京华联店' },
+    { id: '3', name: '瑞幸咖啡北京店' }
+  ];
+
+  assert.deepEqual(filterOutExistingTenants(candidates, tenants).map(item => item.id), ['3']);
+});
+
 test('filters an authorized tenant by Amap POI id', () => {
   const tenants = [{ fields: { '商户名称': '测试商户', '高德POI ID': 'B000123', '经营状态': '在营' } }];
   const candidates = [{ id: 'B000123', name: '完全不同的门店名称' }, { id: 'B000456', name: '另一家门店' }];
