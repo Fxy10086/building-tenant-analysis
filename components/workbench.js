@@ -98,6 +98,7 @@ const inferPoiGroup = poi => {
   if(/^05/.test(poi.typecode)||/餐饮|餐厅|小吃|快餐/.test(text)) return '餐饮';
   return '零售';
 };
+const formatDistance = meters => meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${meters}m`;
 
 export default function Workbench() {
   const pathname = usePathname();
@@ -128,6 +129,7 @@ export default function Workbench() {
   const [period,setPeriod] = useState('本月');
   const [fileName,setFileName] = useState('');
   const [weights,setWeights] = useState({customer:26,complement:24,spend:16,time:12,competition:12,rent:10});
+  const [searchPage,setSearchPage] = useState(1);
 
   useEffect(()=>setMobileOpen(false),[pathname]);
   useEffect(()=>{
@@ -239,8 +241,20 @@ export default function Workbench() {
   },[compareSearch,compareRadius,compareGroup]);
   const activeLocations=amapMode==='live'?liveLocations:locations;
   const searchResults=amapMode==='live'?liveLocations:mockSearchResults;
+  const searchPageSize = 5;
+  const searchPageCount = Math.max(1, Math.ceil(searchResults.length / searchPageSize));
+  const visibleSearchResults = searchResults.slice((searchPage - 1) * searchPageSize, searchPage * searchPageSize);
+  const farthestResultDistance=searchResults.reduce((maximum,item)=>Math.max(maximum,item.distance),0);
   const selectedLocations=selected.map(id=>activeLocations.find(item=>item.id===id)).filter(Boolean);
   const toggleLocation=id=>setSelected(current=>current.includes(id)?current.filter(item=>item!==id):current.length>=3?(notify('最多选择 3 家候选门店'),current):[...current,id]);
+
+  useEffect(()=>{
+    setSearchPage(1);
+  },[compareSearch,compareGroup,compareRadius,amapMode]);
+
+  useEffect(()=>{
+    if(searchPage > searchPageCount) setSearchPage(searchPageCount);
+  },[searchPage,searchPageCount]);
 
   function ComparePage(){
     const liveMap=amapMode==='live'&&amapCenter;
@@ -249,7 +263,7 @@ export default function Workbench() {
         <label className="field" style={{marginTop:0}}><span className="field-label">关键词</span><span className="input-icon"><Search size={16}/><input id="compare-search" className="form-control" value={compareSearch} onChange={e=>setCompareSearch(e.target.value)} placeholder="例如：M Stand、金融中心店"/></span></label>
         <div className="form-row"><label className="field"><span className="field-label">业态</span><select className="form-select" value={compareGroup} onChange={e=>setCompareGroup(e.target.value)}>{['全部','餐饮','饮品','健身','零售'].map(v=><option key={v}>{v}</option>)}</select></label><label className="field"><span className="field-label">搜索半径</span><select className="form-select" value={compareRadius} onChange={e=>setCompareRadius(Number(e.target.value))}><option value="500">500 米</option><option value="1000">1 公里</option><option value="2000">2 公里</option><option value="5000">5 公里</option><option value="10000">10 公里</option></select></label></div>
         {amapError&&<div className="integration-notice"><strong>高德连接提示</strong><span>{amapError}，当前仍可使用模拟数据。</span></div>}
-        <div className="section"><div className="section-title"><h3>搜索结果</h3><span className="panel-note">{amapSearching?'搜索中…':`${searchResults.length} 家门店`}</span></div><div className="search-result-list">{searchResults.length?searchResults.map(item=><div className="search-result" key={item.id}><div><h3>{item.merchant}{item.branch&&` · ${item.branch}`}</h3><p>{item.address}</p><div className="search-meta"><span>{item.group}</span><span>{item.distance}m</span><span>评分 {item.rating}</span><span>{item.sales}</span></div></div><div className="search-result-actions"><button className={`btn ${selected.includes(item.id)?'danger':''}`} onClick={()=>toggleLocation(item.id)}>{selected.includes(item.id)?'移出对比':'加入对比'}</button><button className={`btn ${isLocationSaved(item)?'saved':''}`} onClick={()=>saveLocationCandidate(item)} disabled={isLocationSaved(item)}>{isLocationSaved(item)?<CircleCheck size={15}/>:<BookmarkPlus size={15}/>} {isLocationSaved(item)?'已在候选库':'加入候选'}</button></div></div>):<div className="empty">{amapSearching?'正在搜索融科资讯中心周边商户':'当前条件下没有匹配门店'}</div>}</div></div></section>
+        <div className="section"><div className="section-title"><h3>搜索结果</h3><span className="panel-note">{amapSearching?'搜索中…':`${searchResults.length} 家门店${farthestResultDistance?` · 最远 ${formatDistance(farthestResultDistance)}`:''}`}</span></div><div className="search-result-list">{searchResults.length?visibleSearchResults.map(item=><div className="search-result" key={item.id}><div><h3>{item.merchant}{item.branch&&` · ${item.branch}`}</h3><p>{item.address}</p><div className="search-meta"><span>{item.group}</span><span>{formatDistance(item.distance)}</span><span>评分 {item.rating}</span><span>{item.sales}</span></div></div><div className="search-result-actions"><button className={`btn ${selected.includes(item.id)?'danger':''}`} onClick={()=>toggleLocation(item.id)}>{selected.includes(item.id)?'移出对比':'加入对比'}</button><button className={`btn ${isLocationSaved(item)?'saved':''}`} onClick={()=>saveLocationCandidate(item)} disabled={isLocationSaved(item)}>{isLocationSaved(item)?<CircleCheck size={15}/>:<BookmarkPlus size={15}/>} {isLocationSaved(item)?'已在候选库':'加入候选'}</button></div></div>):<div className="empty">{amapSearching?'正在搜索融科资讯中心周边商户':'当前条件下没有匹配门店'}</div>}</div>{searchResults.length>searchPageSize&&<div className="pagination" aria-label="搜索结果分页"><button className="btn" onClick={()=>setSearchPage(page=>Math.max(1,page-1))} disabled={searchPage===1}>上一页</button><span>第 {searchPage} / {searchPageCount} 页 · 每页 5 家</span><button className="btn" onClick={()=>setSearchPage(page=>Math.min(searchPageCount,page+1))} disabled={searchPage===searchPageCount}>下一页</button></div>}</div></section>
         <section className="panel"><div className="panel-head"><div><h2>融科资讯中心周边位置</h2><p className="page-subtitle">{liveMap?'高德地图实时 POI':'高德配置完成后自动切换真实地图'}</p></div><span className="panel-note">半径 {compareRadius>=1000?`${compareRadius/1000}km`:`${compareRadius}m`}</span></div>{liveMap?<AmapMap center={amapCenter} pois={liveLocations} selectedIds={selected} radius={compareRadius} onToggle={toggleLocation} onError={setAmapError}/>:<div className="geo-stage"><div className="geo-axis-x"/><div className="geo-axis-y"/><div className="geo-ring r1"/><div className="geo-ring r2"/><div className="geo-ring r3"/><div className="geo-center"><Building2 size={17}/></div>{locations.map(item=><button key={item.id} className={`geo-point ${selected.includes(item.id)?'selected':''} ${item.distance>compareRadius?'outside':''}`} style={{left:`${item.x}%`,top:`${item.y}%`}} onClick={()=>toggleLocation(item.id)} aria-label={`${item.merchant}${item.branch}，${item.distance}米`}>{item.group==='饮品'?'咖':item.key==='food'?'餐':'健'}</button>)}<div className="geo-legend">中心：融科资讯中心 · 绿色：已选 · 当前为模拟位置</div></div>}
         <div className="section"><div className="section-title"><h3>已选门店</h3><span className="panel-note">{selected.length}/3</span></div><div className="selected-strip">{selectedLocations.map(item=><span className="selected-item" key={item.id}>{item.merchant} · {item.branch}<button className="icon-btn" style={{width:24,minHeight:24}} onClick={()=>toggleLocation(item.id)} aria-label={`移出${item.merchant}`}><X size={13}/></button></span>)}</div></div></section></div>
       <section className="panel" style={{marginTop:16}}><div className="panel-head"><h2>已选门店横向比较</h2><span className="panel-note">高德位置数据 + 招商参数</span></div><div className="table-wrap"><table style={{minWidth:1080}}><thead><tr><th>候选门店</th><th>位置</th><th className="num">距离</th><th className="num">得分</th><th className="num">可信度</th><th className="num">预计营收</th><th className="num">租售比</th><th>推荐铺位</th><th>操作</th></tr></thead><tbody>{selectedLocations.map(item=>{const p=item.key?candidates[item.key]:null,bc=item.key?businessCases[item.key]:null,unit=item.key?bestUnits(item.key)[0]:null;return <tr key={item.id}><td><b>{item.merchant}</b><br/><span className="panel-note">{item.branch}</span></td><td>{item.address}</td><td className="num">{item.distance}m</td><td className="num">{p?.score??'待评估'}</td><td className="num">{bc?`${bc.confidence}%`:'—'}</td><td className="num">{bc?`${bc.revenue.base}万`:'—'}</td><td className="num">{bc?`${(bc.rent/bc.revenue.base*100).toFixed(1)}%`:'—'}</td><td>{unit?<><b className="unit-code">{unit.code}</b> · {unit.fit[item.key]}分</>:'补充经营参数后匹配'}</td><td>{p?<Link href="/analysis" className="btn" onClick={()=>selectCandidate(item.key)}>详细测算</Link>:<button className="btn" onClick={()=>saveLocationCandidate(item)}>{isLocationSaved(item)?'已加入候选':'加入候选'}</button>}</td></tr>})}</tbody></table></div></section></>;
