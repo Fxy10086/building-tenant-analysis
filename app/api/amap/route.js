@@ -146,22 +146,23 @@ export async function GET(request) {
     const keywords = (params.get('keywords') || '').slice(0, 50);
     const types = (params.get('types') || '').slice(0, 80);
     const samples = createSearchSamples(origin, radius);
+    const typeQueries = types.includes('|') ? types.split('|').filter(Boolean) : [types];
     const results = [];
     for (let index = 0; index < samples.length; index += 3) {
       const batch = samples.slice(index, index + 3);
-      const batchResults = await Promise.all(batch.map(sample =>
-        amapRequest('/v3/place/around', {
-          location: sample.location,
-          radius: sample.radius,
-          keywords,
-          types,
-          city: '110000',
-          city_limit: 'true',
-          sortrule: 'distance',
-          extensions: 'all',
-          offset: sample.offset,
-          page: 1
-        })
+      const batchResults = await Promise.all(batch.flatMap(sample =>
+        typeQueries.map(typeQuery => amapRequest('/v3/place/around', {
+            location: sample.location,
+            radius: sample.radius,
+            keywords,
+            types: typeQuery,
+            city: '110000',
+            city_limit: 'true',
+            sortrule: 'distance',
+            extensions: 'all',
+            offset: sample.offset,
+            page: 1
+          }))
       ));
       results.push(...batchResults);
     }
