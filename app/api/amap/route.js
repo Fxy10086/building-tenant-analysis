@@ -109,20 +109,26 @@ export async function GET(request) {
     const origin = location.split(',').map(Number);
     const keywords = (params.get('keywords') || '').slice(0, 50);
     const types = (params.get('types') || '').slice(0, 80);
-    const results = await Promise.all(createSearchSamples(origin, radius).map(sample =>
-      amapRequest('/v3/place/around', {
-        location: sample.location,
-        radius: sample.radius,
-        keywords,
-        types,
-        city: '110000',
-        city_limit: 'true',
-        sortrule: 'distance',
-        extensions: 'all',
-        offset: sample.offset,
-        page: 1
-      })
-    ));
+    const samples = createSearchSamples(origin, radius);
+    const results = [];
+    for (let index = 0; index < samples.length; index += 3) {
+      const batch = samples.slice(index, index + 3);
+      const batchResults = await Promise.all(batch.map(sample =>
+        amapRequest('/v3/place/around', {
+          location: sample.location,
+          radius: sample.radius,
+          keywords,
+          types,
+          city: '110000',
+          city_limit: 'true',
+          sortrule: 'distance',
+          extensions: 'all',
+          offset: sample.offset,
+          page: 1
+        })
+      ));
+      results.push(...batchResults);
+    }
     const successfulResults = results.filter(result => !result.error);
     if (!successfulResults.length) {
       return errorResponse(results[0]?.error || '高德范围搜索失败', results[0]?.status || 502);
