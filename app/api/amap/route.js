@@ -181,11 +181,13 @@ export async function GET(request) {
       page: 1
     });
     const malls = mallSearch.data?.pois || [];
-    const mallDetails = malls.length ? await amapRequest('/v3/place/detail', {
-      id: malls.slice(0, 15).map(mall => mall.id).join(','),
-      extensions: 'all'
-    }) : { data: { pois: [] } };
-    const detailedMalls = mallDetails.data?.pois || [];
+    const mallDetailResults = malls.length ? await Promise.all(
+      malls.slice(0, 15).map(mall => amapRequest('/v3/place/detail', {
+        id: mall.id,
+        extensions: 'all'
+      }))
+    ) : [];
+    const detailedMalls = mallDetailResults.flatMap(result => result.data?.pois || []);
     const mallById = new Map(malls.map(mall => [mall.id, mall]));
     detailedMalls.forEach(mall => mallById.set(mall.id, { ...mallById.get(mall.id), ...mall }));
 
@@ -193,7 +195,8 @@ export async function GET(request) {
     if (!successfulResults.length) {
       return errorResponse(results[0]?.error || '高德范围搜索失败', results[0]?.status || 502);
     }
-    const directPois = successfulResults.flatMap(result => result.data.pois || []).map(poi => normalizePoi(poi, origin));
+    const directPois = successfulResults.flatMap(result => result.data.pois || [])
+      .map(poi => normalizePoi(poi, origin, mallById.get(poi.parent)));
     const mallPois = [...mallById.values()].flatMap(mall =>
       (Array.isArray(mall.children) ? mall.children : []).map(child => normalizePoi(child, origin, mall))
     );
