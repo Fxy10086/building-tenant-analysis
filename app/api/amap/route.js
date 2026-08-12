@@ -9,8 +9,44 @@ function errorResponse(message, status = 400) {
 
 function isInsideTargetBuilding(poi) {
   if (poi.distance > 250) return false;
-  const text = `${poi.name}${poi.address}`;
+  const text = `${poi.name}${poi.address}${poi.mall || ''}`;
   return /融科(?:资讯|咨询|天地|中心|大厦|店)/.test(text) || /科学院?南路[2二]号/.test(text);
+}
+
+function matchesKeyword(poi, keyword) {
+  if (!keyword) return true;
+  return `${poi.name || ''}${poi.address || ''}${poi.type || ''}`.toLowerCase().includes(keyword.toLowerCase());
+}
+
+function matchesTypes(poi, types) {
+  if (!types) return true;
+  const typecode = String(poi.typecode || '');
+  return types.split('|').some(type => {
+    const prefix = type.replace(/0+$/, '');
+    return prefix && typecode.startsWith(prefix);
+  });
+}
+
+function normalizePoi(poi, origin, mall = null) {
+  const fallbackLocation = mall?.location || '';
+  const [lng, lat] = String(poi.location || fallbackLocation).split(',').map(Number);
+  const rating = typeof poi.biz_ext?.rating === 'string' && poi.biz_ext.rating ? poi.biz_ext.rating : null;
+  const cost = typeof poi.biz_ext?.cost === 'string' && poi.biz_ext.cost ? poi.biz_ext.cost : null;
+  const childAddress = Array.isArray(poi.address) ? poi.address.join('') : poi.address || '';
+  const mallName = mall?.name || '';
+  return {
+    id: poi.id,
+    name: poi.name,
+    address: childAddress || (mallName ? `${mallName}内` : '地址待补充'),
+    mall: mallName,
+    type: poi.type || '',
+    typecode: poi.typecode || '',
+    distance: Number.isFinite(lng) && Number.isFinite(lat) ? distanceInMeters(origin, [lng, lat]) : 0,
+    lng,
+    lat,
+    rating,
+    cost
+  };
 }
 
 function distanceInMeters(origin, target) {
@@ -129,31 +165,43 @@ export async function GET(request) {
       ));
       results.push(...batchResults);
     }
+
+    // Shopping-center POIs expose their internal stores as children. Fetch the
+    // nearest centers separately because category searches often omit them.
+    const mallSearch = await amapRequest('/v3/place/around', {
+      location,
+      radius,
+      types: '060100',
+      city: '110000',
+      city_limit: 'true',
+      sortrule: 'distance',
+      extensions: 'all',
+      offset: 25,
+      page: 1
+    });
+    const malls = mallSearch.data?.pois || [];
+    const mallDetails = malls.length ? await amapRequest('/v3/place/detail', {
+      id: malls.slice(0, 15).map(mall => mall.id).join(','),
+      extensions: 'all'
+    }) : { data: { pois: [] } };
+    const detailedMalls = mallDetails.data?.pois || [];
+    const mallById = new Map(malls.map(mall => [mall.id, mall]));
+    detailedMalls.forEach(mall => mallById.set(mall.id, { ...mallById.get(mall.id), ...mall }));
+
     const successfulResults = results.filter(result => !result.error);
     if (!successfulResults.length) {
       return errorResponse(results[0]?.error || '高德范围搜索失败', results[0]?.status || 502);
     }
-    const rawPois = successfulResults.flatMap(result => result.data.pois || []);
+    const directPois = successfulResults.flatMap(result => result.data.pois || []).map(poi => normalizePoi(poi, origin));
+    const mallPois = [...mallById.values()].flatMap(mall =>
+      (Array.isArray(mall.children) ? mall.children : []).map(child => normalizePoi(child, origin, mall))
+    );
 
-    const pois = rawPois.map(poi => {
-      const [lng, lat] = String(poi.location || '').split(',').map(Number);
-      const rating = typeof poi.biz_ext?.rating === 'string' && poi.biz_ext.rating ? poi.biz_ext.rating : null;
-      const cost = typeof poi.biz_ext?.cost === 'string' && poi.biz_ext.cost ? poi.biz_ext.cost : null;
-      return {
-        id: poi.id,
-        name: poi.name,
-        address: Array.isArray(poi.address) ? poi.address.join('') : poi.address || '地址待补充',
-        type: poi.type || '',
-        typecode: poi.typecode || '',
-        distance: Number.isFinite(lng) && Number.isFinite(lat) ? distanceInMeters(origin, [lng, lat]) : 0,
-        lng,
-        lat,
-        rating,
-        cost
-      };
-    })
+    const pois = [...directPois, ...mallPois]
       .filter(poi => poi.id && Number.isFinite(poi.lng) && Number.isFinite(poi.lat))
       .filter(poi => poi.distance <= radius)
+      .filter(poi => matchesKeyword(poi, keywords))
+      .filter(poi => matchesTypes(poi, types))
       .filter(poi => !isInsideTargetBuilding(poi))
       .filter((poi, index, items) => items.findIndex(item => item.id === poi.id) === index)
       .sort((first, second) => first.distance - second.distance);
