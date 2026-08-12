@@ -91,7 +91,7 @@ const money = value => Number(value).toLocaleString('zh-CN',{maximumFractionDigi
 const groupClass = group => group==='饮品'?'drink':group==='健身'?'gym':group==='百货'?'retail':'';
 const BUILDING_ADDRESS = process.env.NEXT_PUBLIC_BUILDING_ADDRESS || '北京市海淀区中关村融科资讯中心';
 const hasAmapConfig = Boolean(process.env.NEXT_PUBLIC_AMAP_KEY && process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE);
-const amapTypes = {全部:'050000',餐饮:'050000',饮品:'050000',健身:'080100',零售:'060000'};
+const amapTypes = {全部:'050000|060000|080000',餐饮:'050000',饮品:'050000',健身:'080100',零售:'060000'};
 const inferPoiGroup = poi => {
   const text=`${poi.name}${poi.type}`;
   if(/^0801/.test(poi.typecode)||/健身|运动|瑜伽|游泳/.test(text)) return '健身';
@@ -177,7 +177,7 @@ export default function Workbench() {
         .then(data=>{
           const externalPois=filterOutExistingTenants(data.pois,merchants);
           setExcludedTenantCount(data.pois.length-externalPois.length);
-          const items=externalPois.map(poi=>({id:`amap-${poi.id}`,key:null,merchant:poi.name,branch:'高德门店',group:inferPoiGroup(poi),address:poi.address,distance:poi.distance,rating:poi.rating||'暂无',sales:poi.cost?`人均 ${poi.cost} 元`:'真实 POI',x:null,y:null,poiId:poi.id,lng:poi.lng,lat:poi.lat}));
+          const items=externalPois.map(poi=>({id:`amap-${poi.id}`,key:null,merchant:poi.name,branch:poi.mall?`${poi.mall}内`:'高德门店',mall:poi.mall||'',group:inferPoiGroup(poi),address:poi.address,distance:poi.distance,rating:poi.rating||'暂无',sales:poi.cost?`人均 ${poi.cost} 元`:'真实 POI',x:null,y:null,poiId:poi.id,lng:poi.lng,lat:poi.lat}));
           setLiveLocations(compareGroup==='全部'?items:items.filter(item=>item.group===compareGroup));
           setAmapError('');
         })
