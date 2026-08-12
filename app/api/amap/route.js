@@ -49,6 +49,18 @@ function normalizePoi(poi, origin, mall = null) {
   };
 }
 
+function normalizeMallName(name = '') {
+  return name.toLowerCase().replace(/[\s·•()（）-]/g, '').replace(/北京|购物中心|商场|商城|mall/g, '');
+}
+
+function belongsToMall(poi, mall) {
+  if (poi.parent && poi.parent === mall.id) return true;
+  const mallName = normalizeMallName(mall.name);
+  if (!mallName) return false;
+  const text = normalizeMallName(`${poi.address || ''}${poi.pname || ''}${poi.cityname || ''}${poi.adname || ''}`);
+  return text.includes(mallName);
+}
+
 function distanceInMeters(origin, target) {
   const toRadians = value => value * Math.PI / 180;
   const [originLng, originLat] = origin;
@@ -169,18 +181,35 @@ export async function GET(request) {
 
     // Shopping-center POIs expose their internal stores as children. Fetch the
     // nearest centers separately because category searches often omit them.
-    const mallSearch = await amapRequest('/v3/place/around', {
-      location,
-      radius,
-      types: '060100',
-      city: '110000',
-      city_limit: 'true',
-      sortrule: 'distance',
-      extensions: 'all',
-      offset: 25,
-      page: 1
-    });
-    const malls = mallSearch.data?.pois || [];
+    const mallSearchResults = await Promise.all([
+      ...[1, 2, 3].map(page => amapRequest('/v3/place/around', {
+        location,
+        radius,
+        types: '060100',
+        city: '110000',
+        city_limit: 'true',
+        sortrule: 'distance',
+        extensions: 'all',
+        offset: 25,
+        page
+      })),
+      ...['五道口购物中心', '大融城'].map(name => amapRequest('/v3/place/text', {
+        keywords: name,
+        types: '060100',
+        city: '110000',
+        city_limit: 'true',
+        extensions: 'all',
+        offset: 25,
+        page: 1
+      }))
+    ]);
+    const malls = mallSearchResults.flatMap(result => result.data?.pois || [])
+      .filter(mall => mall.id && mall.location)
+      .filter((mall, index, items) => items.findIndex(item => item.id === mall.id) === index)
+      .filter(mall => {
+        const coordinates = mall.location.split(',').map(Number);
+        return coordinates.length === 2 && distanceInMeters(origin, coordinates) <= radius;
+      });
     const mallDetailResults = malls.length ? await Promise.all(
       malls.slice(0, 15).map(mall => amapRequest('/v3/place/detail', {
         id: mall.id,
@@ -190,6 +219,18 @@ export async function GET(request) {
     const detailedMalls = mallDetailResults.flatMap(result => result.data?.pois || []);
     const mallById = new Map(malls.map(mall => [mall.id, mall]));
     detailedMalls.forEach(mall => mallById.set(mall.id, { ...mallById.get(mall.id), ...mall }));
+    const tenantSearchResults = await Promise.all(
+      [...mallById.values()].slice(0, 30).map(mall => amapRequest('/v3/place/around', {
+        location: mall.location,
+        radius: 350,
+        city: '110000',
+        city_limit: 'true',
+        sortrule: 'distance',
+        extensions: 'all',
+        offset: 25,
+        page: 1
+      }))
+    );
 
     const successfulResults = results.filter(result => !result.error);
     if (!successfulResults.length) {
@@ -200,8 +241,14 @@ export async function GET(request) {
     const mallPois = [...mallById.values()].flatMap(mall =>
       (Array.isArray(mall.children) ? mall.children : []).map(child => normalizePoi(child, origin, mall))
     );
+    const searchedMallPois = tenantSearchResults.flatMap((result, index) => {
+      const mall = [...mallById.values()][index];
+      return (result.data?.pois || [])
+        .filter(poi => belongsToMall(poi, mall))
+        .map(poi => normalizePoi(poi, origin, mall));
+    });
 
-    const pois = [...directPois, ...mallPois]
+    const pois = [...directPois, ...mallPois, ...searchedMallPois]
       .filter(poi => poi.id && Number.isFinite(poi.lng) && Number.isFinite(poi.lat))
       .filter(poi => poi.distance <= radius)
       .filter(poi => matchesKeyword(poi, keywords))
