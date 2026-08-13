@@ -4,6 +4,7 @@ const AMAP_BASE = 'https://restapi.amap.com';
 const BUILDING_ADDRESS = '北京市海淀区中关村融科资讯中心';
 const PINNED_MALLS = ['五道口购物中心', '大融城'];
 const MALL_SEARCH_RADIUS = 500;
+const MALL_MEMBERSHIP_RADIUS = 180;
 const MALL_DEEP_SEARCH_PAGES = 3;
 
 function errorResponse(message, status = 400) {
@@ -67,11 +68,11 @@ function belongsToMall(poi, mall) {
   if (poi.parent && poi.parent === mall.id) return true;
   const mallName = normalizeMallName(mall.name);
   if (!mallName) return false;
-  const text = normalizeMallName(`${poi.address || ''}${poi.pname || ''}${poi.cityname || ''}${poi.adname || ''}`);
+  const text = normalizeMallName(`${poi.name || ''}${poi.address || ''}${poi.pname || ''}${poi.cityname || ''}${poi.adname || ''}`);
   return text.includes(mallName);
 }
 
-function isNearMall(poi, mall, radius = MALL_SEARCH_RADIUS) {
+function isNearMall(poi, mall, radius = MALL_MEMBERSHIP_RADIUS) {
   const [lng, lat] = String(poi.location || '').split(',').map(Number);
   const [mallLng, mallLat] = String(mall.location || '').split(',').map(Number);
   return Number.isFinite(lng) && Number.isFinite(lat) && Number.isFinite(mallLng) && Number.isFinite(mallLat) &&
@@ -327,7 +328,11 @@ export async function GET(request) {
       return errorResponse(results[0]?.error || '高德范围搜索失败', results[0]?.status || 502);
     }
     const directPois = successfulResults.flatMap(result => result.data.pois || [])
-      .map(poi => normalizePoi(poi, origin, mallById.get(poi.parent)));
+      .map(poi => normalizePoi(
+        poi,
+        origin,
+        mallById.get(poi.parent) || mallEntries.find(mall => belongsToMall(poi, mall))
+      ));
     const mallPois = [...mallById.values()].flatMap(mall =>
       (Array.isArray(mall.children) ? mall.children : []).map(child => normalizePoi(child, origin, mall))
     );
