@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 
 const AMAP_BASE = 'https://restapi.amap.com';
 const BUILDING_ADDRESS = '北京市海淀区中关村融科资讯中心';
+const PINNED_MALLS = ['五道口购物中心', '大融城'];
+const MALL_SEARCH_RADIUS = 500;
+const MALL_DEEP_SEARCH_PAGES = 3;
 
 function errorResponse(message, status = 400) {
   return NextResponse.json({ ok: false, message }, { status });
@@ -59,6 +62,28 @@ function belongsToMall(poi, mall) {
   if (!mallName) return false;
   const text = normalizeMallName(`${poi.address || ''}${poi.pname || ''}${poi.cityname || ''}${poi.adname || ''}`);
   return text.includes(mallName);
+}
+
+function isNearMall(poi, mall, radius = MALL_SEARCH_RADIUS) {
+  const [lng, lat] = String(poi.location || '').split(',').map(Number);
+  const [mallLng, mallLat] = String(mall.location || '').split(',').map(Number);
+  return Number.isFinite(lng) && Number.isFinite(lat) && Number.isFinite(mallLng) && Number.isFinite(mallLat) &&
+    distanceInMeters([lng, lat], [mallLng, mallLat]) <= radius;
+}
+
+function mallSearchKeywords(mallName, keyword, type) {
+  if (keyword) return `${mallName} ${keyword}`;
+  if (type.startsWith('050')) return `${mallName} 餐饮`;
+  if (type.startsWith('0801')) return `${mallName} 健身`;
+  return `${mallName} 店铺`;
+}
+
+function pinnedMallName(mall) {
+  const normalizedName = normalizeMallName(mall.name);
+  return PINNED_MALLS.find(name => {
+    const normalizedPinnedName = normalizeMallName(name);
+    return normalizedName.includes(normalizedPinnedName) || normalizedPinnedName.includes(normalizedName);
+  });
 }
 
 function distanceInMeters(origin, target) {
@@ -181,8 +206,8 @@ export async function GET(request) {
 
     // Shopping-center POIs expose their internal stores as children. Fetch the
     // nearest centers separately because category searches often omit them.
-    const mallSearchResults = await Promise.all([
-      ...[1, 2, 3].map(page => amapRequest('/v3/place/around', {
+    const nearbyMallSearchResults = await Promise.all(
+      [1, 2, 3].map(page => amapRequest('/v3/place/around', {
         location,
         radius,
         types: '060100',
@@ -192,18 +217,29 @@ export async function GET(request) {
         extensions: 'all',
         offset: 25,
         page
-      })),
-      ...['五道口购物中心', '大融城'].map(name => amapRequest('/v3/place/text', {
+      }))
+    );
+    const pinnedMallSearchResults = await Promise.all(
+      PINNED_MALLS.map(name => amapRequest('/v3/place/text', {
         keywords: name,
-        types: '060100',
         city: '110000',
         city_limit: 'true',
         extensions: 'all',
         offset: 25,
         page: 1
-      }))
-    ]);
-    const malls = mallSearchResults.flatMap(result => result.data?.pois || [])
+      }).then(result => ({ result, name })))
+    );
+    const nearbyMalls = nearbyMallSearchResults.flatMap(result => result.data?.pois || []);
+    const pinnedMalls = pinnedMallSearchResults.flatMap(({ result, name }) =>
+      (result.data?.pois || [])
+        .filter(mall => {
+          const mallName = normalizeMallName(mall.name);
+          const expectedName = normalizeMallName(name);
+          return mallName.includes(expectedName) || expectedName.includes(mallName);
+        })
+        .map(mall => ({ ...mall, name }))
+    );
+    const malls = [...pinnedMalls, ...nearbyMalls]
       .filter(mall => mall.id && mall.location)
       .filter((mall, index, items) => items.findIndex(item => item.id === mall.id) === index)
       .filter(mall => {
@@ -219,10 +255,13 @@ export async function GET(request) {
     const detailedMalls = mallDetailResults.flatMap(result => result.data?.pois || []);
     const mallById = new Map(malls.map(mall => [mall.id, mall]));
     detailedMalls.forEach(mall => mallById.set(mall.id, { ...mallById.get(mall.id), ...mall }));
+    const mallEntries = [...mallById.values()]
+      .sort((first, second) => Number(Boolean(pinnedMallName(second))) - Number(Boolean(pinnedMallName(first))))
+      .slice(0, 15);
     const tenantSearchResults = await Promise.all(
-      [...mallById.values()].slice(0, 30).map(mall => amapRequest('/v3/place/around', {
+      mallEntries.map(mall => amapRequest('/v3/place/around', {
         location: mall.location,
-        radius: 350,
+        radius: MALL_SEARCH_RADIUS,
         city: '110000',
         city_limit: 'true',
         sortrule: 'distance',
@@ -230,6 +269,39 @@ export async function GET(request) {
         offset: 25,
         page: 1
       }))
+    );
+    // Amap does not consistently expose a store's parent shopping mall. Query
+    // each mall by name as well, so stores whose address lacks a parent field
+    // are still available to the search result.
+    const pinnedMallEntries = mallEntries.filter(pinnedMallName);
+    const mallTenantTextResults = await Promise.all(
+      pinnedMallEntries.flatMap(mall => typeQueries.flatMap(typeQuery =>
+        Array.from({ length: MALL_DEEP_SEARCH_PAGES }, (_, index) => amapRequest('/v3/place/text', {
+          keywords: mallSearchKeywords(pinnedMallName(mall) || mall.name, keywords, typeQuery || '060000'),
+          types: typeQuery,
+          city: '110000',
+          city_limit: 'true',
+          extensions: 'all',
+          offset: 25,
+          page: index + 1
+        }).then(result => ({ result, mall })))
+      ))
+    );
+    const pinnedMallAroundResults = await Promise.all(
+      pinnedMallEntries.flatMap(mall => typeQueries.flatMap(typeQuery =>
+        Array.from({ length: MALL_DEEP_SEARCH_PAGES }, (_, index) => amapRequest('/v3/place/around', {
+          location: mall.location,
+          radius: MALL_SEARCH_RADIUS,
+          keywords,
+          types: typeQuery,
+          city: '110000',
+          city_limit: 'true',
+          sortrule: 'distance',
+          extensions: 'all',
+          offset: 25,
+          page: index + 1
+        }).then(result => ({ result, mall })))
+      ))
     );
 
     const successfulResults = results.filter(result => !result.error);
@@ -242,14 +314,25 @@ export async function GET(request) {
       (Array.isArray(mall.children) ? mall.children : []).map(child => normalizePoi(child, origin, mall))
     );
     const searchedMallPois = tenantSearchResults.flatMap((result, index) => {
-      const mall = [...mallById.values()][index];
+      const mall = mallEntries[index];
       return (result.data?.pois || [])
-        .filter(poi => belongsToMall(poi, mall))
+        .filter(poi => belongsToMall(poi, mall) || isNearMall(poi, mall))
         .map(poi => normalizePoi(poi, origin, mall));
     });
+    const namedMallPois = mallTenantTextResults.flatMap(({ result, mall }) =>
+      (result.data?.pois || [])
+        .filter(poi => isNearMall(poi, mall) || belongsToMall(poi, mall))
+        .map(poi => normalizePoi(poi, origin, mall))
+    );
+    const deepMallPois = pinnedMallAroundResults.flatMap(({ result, mall }) =>
+      (result.data?.pois || [])
+        .filter(poi => isNearMall(poi, mall) || belongsToMall(poi, mall))
+        .map(poi => normalizePoi(poi, origin, mall))
+    );
 
-    const pois = [...directPois, ...mallPois, ...searchedMallPois]
+    const pois = [...directPois, ...mallPois, ...searchedMallPois, ...namedMallPois, ...deepMallPois]
       .filter(poi => poi.id && Number.isFinite(poi.lng) && Number.isFinite(poi.lat))
+      .filter(poi => !mallById.has(poi.id))
       .filter(poi => poi.distance <= radius)
       .filter(poi => matchesKeyword(poi, keywords))
       .filter(poi => matchesTypes(poi, types))
