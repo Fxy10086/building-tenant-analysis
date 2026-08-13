@@ -30,6 +30,13 @@ function matchesTypes(poi, types) {
   });
 }
 
+function isMerchantPoi(poi) {
+  const typecode = String(poi.typecode || '');
+  const text = `${poi.name || ''}${poi.type || ''}`;
+  if (typecode === '060100') return false;
+  return !/(停车场|充电站|卫生间|洗手间|出入口|入口|出口|电梯|扶梯|服务台|客服中心|母婴室|公共电话|ATM|车库)/.test(text);
+}
+
 function normalizePoi(poi, origin, mall = null) {
   const fallbackLocation = mall?.location || '';
   const [lng, lat] = String(poi.location || fallbackLocation).split(',').map(Number);
@@ -333,6 +340,7 @@ export async function GET(request) {
     const pois = [...directPois, ...mallPois, ...searchedMallPois, ...namedMallPois, ...deepMallPois]
       .filter(poi => poi.id && Number.isFinite(poi.lng) && Number.isFinite(poi.lat))
       .filter(poi => !mallById.has(poi.id))
+      .filter(isMerchantPoi)
       .filter(poi => poi.distance <= radius)
       .filter(poi => matchesKeyword(poi, keywords))
       .filter(poi => matchesTypes(poi, types))
