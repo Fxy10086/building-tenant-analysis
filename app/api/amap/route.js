@@ -18,7 +18,7 @@ function isInsideTargetBuilding(poi) {
 
 function matchesKeyword(poi, keyword) {
   if (!keyword) return true;
-  return `${poi.name || ''}${poi.address || ''}${poi.type || ''}`.toLowerCase().includes(keyword.toLowerCase());
+  return `${poi.name || ''}${poi.address || ''}${poi.type || ''}${poi.mall || ''}`.toLowerCase().includes(keyword.toLowerCase());
 }
 
 function matchesTypes(poi, types) {
@@ -237,15 +237,26 @@ export async function GET(request) {
       }).then(result => ({ result, name })))
     );
     const nearbyMalls = nearbyMallSearchResults.flatMap(result => result.data?.pois || []);
-    const pinnedMalls = pinnedMallSearchResults.flatMap(({ result, name }) =>
-      (result.data?.pois || [])
+    const pinnedMalls = pinnedMallSearchResults.flatMap(({ result, name }) => {
+      const expectedName = normalizeMallName(name);
+      return (result.data?.pois || [])
         .filter(mall => {
           const mallName = normalizeMallName(mall.name);
-          const expectedName = normalizeMallName(name);
           return mallName.includes(expectedName) || expectedName.includes(mallName);
         })
+        .sort((first, second) => {
+          const score = mall => {
+            const mallName = normalizeMallName(mall.name);
+            const text = `${mall.name || ''}${mall.type || ''}`;
+            return (mallName === expectedName ? 100 : 0) +
+              (String(mall.typecode || '').startsWith('0601') ? 50 : 0) -
+              (/(停车场|充电站|出入口|入口|出口|卫生间)/.test(text) ? 200 : 0);
+          };
+          return score(second) - score(first);
+        })
+        .slice(0, 1)
         .map(mall => ({ ...mall, name }))
-    );
+    });
     const malls = [...pinnedMalls, ...nearbyMalls]
       .filter(mall => mall.id && mall.location)
       .filter((mall, index, items) => items.findIndex(item => item.id === mall.id) === index)
