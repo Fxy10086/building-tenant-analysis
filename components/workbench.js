@@ -150,10 +150,21 @@ export default function Workbench() {
   const [feishuChecking,setFeishuChecking] = useState(false);
   const [feishuSyncing,setFeishuSyncing] = useState(false);
   const [feishuResult,setFeishuResult] = useState(null);
+  const [feishuRecords,setFeishuRecords] = useState(null);
+  const [feishuDataState,setFeishuDataState] = useState('idle');
   const [weights,setWeights] = useState({customer:26,complement:24,spend:16,time:12,competition:12,rent:10});
   const [searchPage,setSearchPage] = useState(1);
   const [pageInput,setPageInput] = useState('1');
   const [pageJumpEditing,setPageJumpEditing] = useState(false);
+  const displayMerchants = useMemo(()=>{
+    if(!feishuRecords?.length) return merchants;
+    return feishuRecords.map((record,index)=>{
+      const source=record.sourceFields||{};
+      const area=Number(String(source['租赁面积']||source['面积']||'').replace(/[,，㎡平方米]/g,''))||0;
+      const latest=[...(record.monthlySales||[])].reverse().find(value=>Number.isFinite(value));
+      return {id:record.recordId||`feishu-${index}`,name:record.brand||record.brandAlias||`飞书商户 ${index+1}`,group:record.category||'未分类',subtype:record.subcategory||record.category||'未分类',floor:[record.floorArea,record.floor].filter(Boolean).join(' '),spend:0,area,daily:0,revenue:latest?latest/10000:0,rent:0,status:record.leaseStatus||'在营'};
+    }).filter(item=>item.name&&item.status!=='已退租'&&item.status!=='已撤场');
+  },[feishuRecords]);
 
   useEffect(()=>setMobileOpen(false),[pathname]);
   useEffect(()=>{
@@ -167,6 +178,24 @@ export default function Workbench() {
       .finally(()=>{if(active) setFeishuChecking(false);});
     return ()=>{active=false;};
   },[page]);
+  useEffect(()=>{
+    let active=true;
+    fetch('/api/feishu?action=records',{cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok||!data.ok) throw new Error(data.message);return data;}).then(data=>{if(active){setFeishuRecords(data.records||[]);setFeishuDataState('live');}}).catch(()=>{if(active)setFeishuDataState('fallback');});
+    return ()=>{active=false;};
+  },[]);
+  useEffect(()=>{
+    let active=true;
+    fetch('/api/feishu?action=records',{cache:'no-store'})
+      .then(response=>response.json().then(data=>({ok:response.ok,data})))
+      .then(({ok,data})=>{
+        if(!active) return;
+        if(!ok||!data.ok) throw new Error(data.message||'Feishu records unavailable');
+        setFeishuRecords(Array.isArray(data.records)?data.records:[]);
+        setFeishuDataState('live');
+      })
+      .catch(()=>{if(active) setFeishuDataState('fallback');});
+    return ()=>{active=false;};
+  },[]);
   useEffect(()=>{
     try {
       const stored=JSON.parse(localStorage.getItem('merchant-fit-shortlist')||'null');
@@ -205,7 +234,7 @@ export default function Workbench() {
       fetch(`/api/amap?${query}`,{signal:controller.signal})
         .then(async response=>{const data=await response.json();if(!response.ok||!data.ok) throw new Error(data.message||'周边商户搜索失败');return data;})
         .then(data=>{
-          const externalPois=filterOutExistingTenants(data.pois,merchants);
+          const externalPois=filterOutExistingTenants(data.pois,displayMerchants);
           setExcludedTenantCount(data.pois.length-externalPois.length);
           const items=externalPois.map(poi=>{const category=inferPoiCategory(poi);return {id:`amap-${poi.id}`,key:null,merchant:poi.name,branch:poi.mall?`${poi.mall}内`:'高德门店',mall:poi.mall||'',group:category.group,subtype:category.subtype,address:poi.address,distance:poi.distance,rating:poi.rating||'暂无',sales:poi.cost?`人均 ${poi.cost} 元`:'真实 POI',x:null,y:null,poiId:poi.id,lng:poi.lng,lat:poi.lat};});
           setLiveLocations(items.filter(item=>(compareGroup==='全部'||item.group===compareGroup)&&(compareSubtype==='全部'||item.subtype===compareSubtype)));
@@ -350,7 +379,7 @@ export default function Workbench() {
       </section></>;
   }
 
-  const filteredMerchants=merchants.filter(item=>(merchantGroup==='全部'||item.group===merchantGroup)&&(merchantSubtype==='全部'||item.subtype===merchantSubtype)&&(!merchantSearch||`${item.name}${item.group}${item.subtype}`.toLowerCase().includes(merchantSearch.toLowerCase())));
+  const filteredMerchants=displayMerchants.filter(item=>(merchantGroup==='全部'||item.group===merchantGroup)&&(merchantSubtype==='全部'||item.subtype===merchantSubtype)&&(!merchantSearch||`${item.name}${item.group}${item.subtype}`.toLowerCase().includes(merchantSearch.toLowerCase())));
   function MerchantsPage(){return <>{header(<button className="btn" onClick={()=>notify('商户数据已导出')}><Download size={16}/>导出 CSV</button>)}<div className="grid four" style={{marginBottom:16}}>{CATEGORY_GROUPS.slice(1).map(label=>{const count=merchants.filter(item=>item.group===label).length;return <MetricCard key={label} label={label} value={`${count} 家`} note={`占比 ${Math.round(count/merchants.length*100)}%`}/>})}</div><section className="panel"><div className="toolbar"><label className="field search"><span className="field-label">搜索商户</span><span className="input-icon"><Search size={16}/><input className="form-control" value={merchantSearch} onChange={e=>setMerchantSearch(e.target.value)} placeholder="名称、大类或细分业态"/></span></label><label className="field"><span className="field-label">大类</span><select className="form-select" value={merchantGroup} onChange={e=>{setMerchantGroup(e.target.value);setMerchantSubtype('全部');}}>{CATEGORY_GROUPS.map(v=><option key={v}>{v}</option>)}</select></label><label className="field"><span className="field-label">细分业态</span><select className="form-select" value={merchantSubtype} onChange={e=>setMerchantSubtype(e.target.value)}>{SUBTYPES_BY_GROUP[merchantGroup].map(v=><option key={v}>{v}</option>)}</select></label></div><div className="table-wrap"><table style={{minWidth:900}}><thead><tr><th>商户</th><th>大类</th><th>细分业态</th><th>楼层</th><th className="num">客单价</th><th className="num">面积</th><th className="num">日均客流</th><th className="num">月营收</th><th>状态</th></tr></thead><tbody>{filteredMerchants.map(item=><tr key={item.id}><td>{item.name}</td><td><span className={`category-swatch ${groupClass(item.group)}`}/>{item.group}</td><td>{item.subtype}</td><td>{item.floor}</td><td className="num">{item.spend}元</td><td className="num">{item.area}㎡</td><td className="num">{item.daily}</td><td className="num">{item.revenue}万</td><td><span className="badge">在营</span></td></tr>)}</tbody></table></div><p className="panel-note" style={{marginTop:12}}>显示 {filteredMerchants.length}/25 家商户</p></section></>}
 
   function UnitsPage(){const totalArea=units.reduce((s,u)=>s+u.area,0),totalRent=units.reduce((s,u)=>s+u.rent,0);return <>{header(<button className="btn" onClick={()=>notify('铺位表已导出')}><Download size={16}/>导出铺位表</button>)}<div className="grid four" style={{marginBottom:16}}><MetricCard label="可招商铺位" value="6 个" note="覆盖 B1–4F"/><MetricCard label="可招商面积" value={`${money(totalArea)}㎡`} note={`平均 ${Math.round(totalArea/6)}㎡`}/><MetricCard label="潜在月租" value={`${money(totalRent)}万`} note="满租情景"/><MetricCard label="60天内交付" value="3 个" note="需优先招商" warn/></div><section className="panel"><div className="panel-head"><h2>铺位条件与商户匹配</h2><span className="panel-note">工程条件已纳入适配分</span></div><div className="table-wrap"><table style={{minWidth:1030}}><thead><tr><th>铺位</th><th>楼层</th><th className="num">面积</th><th className="num">月租</th><th className="num">电量</th><th>给排水</th><th>排烟</th><th>燃气</th><th>营业时段</th><th>交付日</th><th>最佳候选</th></tr></thead><tbody>{units.map(unit=>{const [key,score]=Object.entries(unit.fit).sort((a,b)=>b[1]-a[1])[0];return <tr key={unit.code}><td><b className="unit-code">{unit.code}</b></td><td>{unit.floor}</td><td className="num">{unit.area}㎡</td><td className="num">{unit.rent}万</td><td className="num">{unit.power}kW</td><td>{unit.water}</td><td>{unit.exhaust}</td><td>{unit.gas}</td><td>{unit.hours}</td><td>{unit.delivery}</td><td>{candidates[key].name} · <b>{score}分</b></td></tr>})}</tbody></table></div></section></>}
