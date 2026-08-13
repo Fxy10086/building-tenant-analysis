@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getFeishuConfig, normalizeFeishuRecord } from '../lib/feishu.mjs';
 
-test('uses the full sales table name by default', () => {
-  assert.equal(getFeishuConfig().tableName, '商业销售数据分析');
+test('uses the current-year sales table by default', () => {
+  assert.equal(getFeishuConfig().tableName, '2026年销售报表');
 });
 
 test('maps the existing Feishu fields without renaming them', () => {
