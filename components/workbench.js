@@ -9,7 +9,7 @@ import {
   Bell, BookmarkCheck, BookmarkPlus, Building2, ChartNoAxesCombined, CircleCheck, ClipboardCheck,
   Columns3, Database, Download, FileDown, History, MapPinned, Menu,
   Plus, RotateCcw, Save, ScanSearch, Search, SlidersHorizontal,
-  Sparkles, Store, Upload, UserRound, Users, X
+  Sparkles, Store, UserRound, Users, X
 } from 'lucide-react';
 
 const merchants = [
@@ -130,13 +130,27 @@ export default function Workbench() {
   const [merchantSearch,setMerchantSearch] = useState('');
   const [merchantGroup,setMerchantGroup] = useState('全部');
   const [period,setPeriod] = useState('本月');
-  const [fileName,setFileName] = useState('');
+  const [feishuStatus,setFeishuStatus] = useState(null);
+  const [feishuChecking,setFeishuChecking] = useState(false);
+  const [feishuSyncing,setFeishuSyncing] = useState(false);
+  const [feishuResult,setFeishuResult] = useState(null);
   const [weights,setWeights] = useState({customer:26,complement:24,spend:16,time:12,competition:12,rent:10});
   const [searchPage,setSearchPage] = useState(1);
   const [pageInput,setPageInput] = useState('1');
   const [pageJumpEditing,setPageJumpEditing] = useState(false);
 
   useEffect(()=>setMobileOpen(false),[pathname]);
+  useEffect(()=>{
+    if(page!=='import') return;
+    let active=true;
+    setFeishuChecking(true);
+    fetch('/api/feishu?action=status',{cache:'no-store'})
+      .then(response=>response.json())
+      .then(data=>{if(active) setFeishuStatus(data);})
+      .catch(()=>{if(active) setFeishuStatus({ok:false,configured:false,message:'暂时无法读取配置状态'});})
+      .finally(()=>{if(active) setFeishuChecking(false);});
+    return ()=>{active=false;};
+  },[page]);
   useEffect(()=>{
     try {
       const stored=JSON.parse(localStorage.getItem('merchant-fit-shortlist')||'null');
@@ -331,7 +345,31 @@ export default function Workbench() {
 
   function DecisionsPage(){return <>{header(<button className="btn primary" onClick={()=>notify('新的决策事项已创建')}><Plus size={16}/>新建决策</button>)}<div className="pipeline" style={{marginBottom:16}}>{[['初步分析',3,'active'],['尽调与复核',2,'active'],['商务谈判',1,'warn'],['内部审批',1,''],['已签约',0,'']].map(([label,count,cls])=><div className={`pipeline-step ${cls}`} key={label}><span>{label}</span><strong>{count}</strong></div>)}</div><section className="panel"><div className="panel-head"><h2>在途决策事项</h2><span className="panel-note">按截止日期排序</span></div><div className="table-wrap"><table style={{minWidth:920}}><thead><tr><th>候选商户</th><th className="num">评分</th><th>阶段</th><th>负责人</th><th>目标铺位</th><th>下一步</th><th>截止日</th><th>状态</th><th>操作</th></tr></thead><tbody>{decisions.map((r,i)=><tr key={r[0]}><td><b>{r[0]}</b></td><td className="num">{r[1]}</td><td>{r[2]}</td><td>{r[3]}</td><td><b className="unit-code">{r[4]}</b></td><td>{r[5]}</td><td>{r[6]}</td><td><span className={`badge ${r[7]==='待审批'?'blue':r[7]==='进行中'?'':'warn'}`}>{r[7]}</span></td><td><button className="btn" onClick={()=>notify(`${r[0]}的决策记录已打开`)}>更新</button></td></tr>)}</tbody></table></div></section></>}
 
-  function ImportPage(){return <>{header(<button className="btn" onClick={()=>notify('CSV模板已下载')}><Download size={16}/>下载模板</button>)}<div className="grid two"><section className="panel"><div className="panel-head"><h2>上传经营数据</h2><span className="panel-note">CSV / XLSX</span></div><div className="dropzone"><div><Upload size={38}/><h3>选择商户数据文件</h3><p>当前经营数据为模拟环境，真实数据接入前将启用登录权限</p><input style={{marginTop:14}} type="file" accept=".csv,.xlsx,.xls" onChange={e=>setFileName(e.target.files?.[0]?.name||'')}/></div></div><div className="button-row"><button className="btn primary" disabled={!fileName} onClick={()=>notify(`${fileName}已完成模拟导入`)}><Database size={16}/>导入数据</button></div></section><section className="panel"><div className="panel-head"><h2>数据源架构</h2><span className="badge blue">服务端连接</span></div><div className="signal-list"><div className="signal-row"><span>经营数据</span><span>Mock Adapter</span><strong>已启用</strong></div><div className="signal-row"><span>高德地图</span><span>Server + JS API</span><strong>{hasAmapConfig?'已启用':'待配置'}</strong></div><div className="signal-row"><span>飞书多维表格</span><span>Server API</span><strong>待配置</strong></div><div className="signal-row"><span>登录鉴权</span><span>Auth Layer</span><strong>待配置</strong></div></div></section></div></>}
+  async function checkFeishuConnection(){
+    if(!feishuStatus?.configured){
+      notify('请先在 Vercel 配置飞书 App ID 和 App Secret');
+      return;
+    }
+    setFeishuSyncing(true);
+    setFeishuResult(null);
+    try {
+      const response=await fetch('/api/feishu',{method:'POST'});
+      const data=await response.json();
+      if(!response.ok||!data.ok) throw new Error(data.message||'飞书连接失败');
+      setFeishuResult(data);
+      notify(`连接成功，已读取 ${data.recordCount} 条记录`);
+    } catch(error){
+      setFeishuResult({ok:false,message:error.message});
+      notify(error.message||'飞书连接失败');
+    } finally {
+      setFeishuSyncing(false);
+    }
+  }
+
+  function ImportPage(){
+    const configured=Boolean(feishuStatus?.configured);
+    const statusText=feishuChecking?'检查中':configured?'已配置':'待配置';
+    return <>{header(<span className={`badge ${configured?'':'blue'}`}>飞书只读接入</span>)}<div className="grid two"><section className="panel"><div className="panel-head"><div><h2>飞书多维表格</h2><p className="page-subtitle">网站只读取数据，不会新增、修改或删除飞书字段</p></div><span className={`badge ${configured?'':'warn'}`}>{statusText}</span></div><div className="signal-list feishu-config-list"><div className="signal-row"><span>数据表</span><span>按名称发现</span><strong>{feishuStatus?.tableName||'商业销售数据分析'}</strong></div><div className="signal-row"><span>App Token</span><span>服务端保存</span><strong>{feishuStatus?.appTokenConfigured?'已配置':'已预留'}</strong></div><div className="signal-row"><span>App ID</span><span>服务端保存</span><strong>{feishuStatus?.appIdConfigured?'已配置':'待配置'}</strong></div><div className="signal-row"><span>App Secret</span><span>服务端保存</span><strong>{feishuStatus?.appSecretConfigured?'已配置':'待配置'}</strong></div><div className="signal-row"><span>访问模式</span><span>Server API</span><strong>只读</strong></div></div>{!configured&&<div className="integration-notice"><strong>还差飞书应用凭证</strong><span>创建企业自建应用后，只需在 Vercel 环境变量中填写 App ID 和 App Secret。密钥不会显示在网页中。</span></div>}{feishuResult&&<div className={`integration-notice ${feishuResult.ok?'success':''}`}><strong>{feishuResult.ok?'连接成功':'连接失败'}</strong><span>{feishuResult.ok?`已识别“${feishuResult.tableName}”，读取 ${feishuResult.recordCount} 条记录。当前仅做连接校验，暂不覆盖网站数据。`:feishuResult.message}</span></div>}<div className="button-row"><button className="btn primary" disabled={!configured||feishuSyncing||feishuChecking} onClick={checkFeishuConnection}><Database size={16}/>{feishuSyncing?'正在读取':'检查飞书连接'}</button></div></section><section className="panel"><div className="panel-head"><h2>接入进度</h2><span className="badge blue">网站内部已预置</span></div><div className="signal-list"><div className="signal-row"><span>字段映射</span><span>原字段读取</span><strong>已完成</strong></div><div className="signal-row"><span>月份销售</span><span>1月-12月</span><strong>已完成</strong></div><div className="signal-row"><span>表格识别</span><span>按表名自动查找</span><strong>已完成</strong></div><div className="signal-row"><span>每日同步</span><span>定时任务</span><strong>待启用</strong></div><div className="signal-row"><span>数据落库</span><span>安全缓存</span><strong>待启用</strong></div><div className="signal-row"><span>登录保护</span><span>访问权限</span><strong>待启用</strong></div></div><div className="integration-notice"><strong>当前不会替换经营数据</strong><span>正式上线前还需完成登录保护、数据库缓存和每日自动同步。现在的连接检查不会把真实经营数据暴露到页面。</span></div></section></div></>}
 
   function ModelPage(){const labels={customer:'客群匹配',complement:'业态互补',spend:'消费能力',time:'消费时段',competition:'竞争强度',rent:'租金承受'},total=Object.values(weights).reduce((a,b)=>a+b,0);return <>{header(<><button className="btn" onClick={()=>setWeights({customer:26,complement:24,spend:16,time:12,competition:12,rent:10})}><RotateCcw size={16}/>恢复默认</button><button className="btn primary" disabled={total!==100} onClick={()=>notify('评分模型已保存')}><Save size={16}/>保存模型</button></>)}<div className="grid two"><section className="panel"><div className="panel-head"><div><h2>评分权重</h2><p className="page-subtitle">六项指标合计必须为100%</p></div><div><div className="model-total">{total}%</div><span className="panel-note">当前合计</span></div></div>{Object.entries(weights).map(([key,value])=><label className="weight-row" key={key}><span>{labels[key]}</span><input type="range" min="0" max="40" value={value} onChange={e=>setWeights({...weights,[key]:Number(e.target.value)})}/><span className="weight-value">{value}%</span></label>)}</section><section className="panel"><div className="panel-head"><h2>历史回测</h2><span className="badge blue">模拟样本</span></div><div className="grid three"><Metric label="样本数量" value="42" note="近24个月"/><Metric label="建议准确率" value="76%" note="较v1.2 +5pt"/><Metric label="平均误差" value="8.4分" note="目标低于7分"/></div><div className="section"><div className="decision risk"><h3>人工复核边界</h3><p>低样本业态、工程条件异常或租售比超过15%时必须进入人工审批。</p></div></div></section></div></>}
 
