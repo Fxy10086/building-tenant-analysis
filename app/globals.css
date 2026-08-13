@@ -24,6 +24,7 @@ html { background: var(--bg); }
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
   color: var(--text);
   background: var(--bg);
   font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
@@ -84,7 +85,7 @@ h3 { font-size: 14px; font-weight: 600; }
 .nav-link.active { color: var(--brand); background: var(--brand-soft); font-weight: 600; }
 .sidebar-foot { margin: 0 12px; padding: 14px 4px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 
-.workspace { min-height: 100vh; margin-left: var(--sidebar); }
+.workspace { min-width: 0; min-height: 100vh; margin-left: var(--sidebar); }
 .topbar {
   position: sticky;
   top: 0;
@@ -295,13 +296,13 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .mobile-menu { display: inline-flex; }
   .mobile-overlay.open { position: fixed; inset: 0; z-index: 35; display: block; background: rgba(12,24,28,.3); }
   .main { padding: 18px; }
-  .topbar { padding: 0 16px; }
+  .topbar { padding: 0 16px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
   .grid.two, .grid.three { grid-template-columns: 1fr; }
   .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
   h1 { font-size: 21px; }
-  .main { padding: 14px; }
+  .main { padding: 14px max(14px, env(safe-area-inset-right)) 24px max(14px, env(safe-area-inset-left)); }
   .building, .hide-mobile { display: none; }
   .page-head { display: block; }
   .page-actions { margin-top: 14px; flex-wrap: wrap; }
@@ -319,5 +320,9 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .weight-row { grid-template-columns: 90px minmax(90px, 1fr) 46px; gap: 8px; }
   .geo-stage { min-height: 340px; }
   .amap-stage { min-height: 340px; }
-  .drawer-backdrop { padding: 66px 10px 10px; }
+  .drawer-backdrop { padding: calc(66px + env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+  .panel, .metric-card { padding: 14px; }
+  .page-actions, .button-row, .search-result-actions { width: 100%; }
+  .page-actions .btn, .button-row .btn, .search-result-actions .btn { flex: 1 1 auto; }
+  .pagination .btn { min-width: 88px; }
 }
