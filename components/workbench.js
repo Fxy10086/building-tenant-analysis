@@ -171,7 +171,7 @@ export default function Workbench() {
     const timer=setTimeout(()=>{
       setAmapSearching(true);
       const keyword=compareSearch.trim();
-      const query=new URLSearchParams({action:'around',location:amapCenter.join(','),radius:String(compareRadius),keywords:keyword,types:keyword&&compareGroup==='全部'?'':amapTypes[compareGroup]||''});
+      const query=new URLSearchParams({action:'around',location:amapCenter.join(','),radius:String(compareRadius),keywords:keyword,types:amapTypes[compareGroup]||''});
       fetch(`/api/amap?${query}`,{signal:controller.signal})
         .then(async response=>{const data=await response.json();if(!response.ok||!data.ok) throw new Error(data.message||'周边商户搜索失败');return data;})
         .then(data=>{
