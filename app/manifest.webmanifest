@@ -1,0 +1,10 @@
+{
+  "name": "楼宇招商分析台",
+  "short_name": "招商分析台",
+  "description": "写字楼商户招商适配分析、铺位匹配与经营决策工作台",
+  "start_url": "/analysis",
+  "display": "standalone",
+  "background_color": "#f3f6f7",
+  "theme_color": "#f3f6f7",
+  "lang": "zh-CN"
+}
