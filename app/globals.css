@@ -212,6 +212,8 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .signal-row { padding: 8px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(100px, 1fr) 90px 60px; gap: 10px; align-items: center; font-size: 12px; }
 .signal-row:last-child { border-bottom: 0; }
 .signal-row strong { text-align: right; }
+.feishu-config-list .signal-row { grid-template-columns: minmax(90px, 1fr) 100px minmax(110px, auto); }
+.feishu-config-list .signal-row strong { overflow-wrap: anywhere; }
 .unit-code { color: var(--brand); font-weight: 600; }
 
 .toolbar { margin-bottom: 16px; display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
@@ -317,6 +319,7 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .score-ring { width: 66px; }
   .bar-row, .confidence { grid-template-columns: 76px minmax(60px, 1fr) 36px; gap: 7px; }
   .signal-row { grid-template-columns: 1fr 68px 48px; gap: 7px; }
+  .feishu-config-list .signal-row { grid-template-columns: minmax(74px, 1fr) 76px minmax(92px, auto); }
   .weight-row { grid-template-columns: 90px minmax(90px, 1fr) 46px; gap: 8px; }
   .geo-stage { min-height: 340px; }
   .amap-stage { min-height: 340px; }
