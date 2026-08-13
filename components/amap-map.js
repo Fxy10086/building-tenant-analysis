@@ -75,7 +75,7 @@ export default function AmapMap({ center, pois, selectedIds, radius, onToggle, o
       const markerNode = document.createElement('button');
       markerNode.type = 'button';
       markerNode.className = `amap-poi-marker ${selectedIds.includes(poi.id) ? 'selected' : ''}`;
-      markerNode.textContent = poi.group === '餐饮' ? '餐' : poi.group === '健身' ? '健' : '商';
+      markerNode.textContent = poi.group === '餐饮' ? '餐' : poi.group === '休闲娱乐' ? '娱' : poi.group === '服务配套' ? '服' : '零';
       markerNode.title = `${poi.merchant}，${poi.distance}米`;
       markerNode.addEventListener('click', () => onToggle(poi.id));
       new AMap.Marker({
