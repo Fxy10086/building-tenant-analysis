@@ -266,6 +266,19 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .action-table { min-width: 760px; }
 .report-source { margin-top: 18px; padding-top: 13px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .report-source strong { color: var(--ink); }
+.analysis-upload { margin-top: 14px; padding: 12px; border: 1px dashed #9fb4ae; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 14px; align-items: center; background: var(--soft); }
+.analysis-upload.error { border-color: var(--orange); background: var(--orange-soft); }
+.analysis-upload-copy { min-width: 0; display: flex; align-items: center; gap: 9px; }
+.analysis-upload-copy > svg { flex: 0 0 auto; color: var(--brand); }
+.analysis-upload-copy div { min-width: 0; display: grid; gap: 3px; }
+.analysis-upload-copy strong { font-size: 12px; }
+.analysis-upload-copy span, .analysis-upload small, .analysis-upload > p { color: var(--muted); font-size: 11px; }
+.analysis-upload-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.analysis-upload-actions { display: flex; align-items: center; gap: 7px; }
+.analysis-upload > p { grid-column: 1 / -1; color: var(--orange); }
+.analysis-upload small { grid-column: 1 / -1; }
+.engineering-tags { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 7px; }
+.engineering-tags span { padding: 6px 8px; border: 1px solid var(--line); color: var(--muted); background: var(--soft); font-size: 11px; }
 .geo-stage { min-height: 420px; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--soft); }
 .amap-stage { width: 100%; min-height: 420px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--soft); }
 .amap-building-marker, .amap-poi-marker { display: grid; place-items: center; border: 2px solid #fff; border-radius: 50%; color: #fff; box-shadow: 0 3px 10px rgba(22,39,45,.25); font-size: 12px; font-weight: 600; }
@@ -338,6 +351,9 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .decision-banner { grid-template-columns: 1fr; gap: 14px; }
   .decision-banner-side { padding: 12px 0 0; border-left: 0; border-top: 1px solid rgba(14, 126, 109, .22); text-align: left; }
   .report-source { grid-template-columns: 1fr; gap: 4px; }
+  .analysis-upload { grid-template-columns: 1fr; }
+  .analysis-upload-actions { flex-wrap: wrap; }
+  .analysis-upload-actions .btn { flex: 1 1 auto; }
   .search-result { grid-template-columns: 1fr; }
   .search-result-actions { flex-direction: row; flex-wrap: wrap; }
   .pagination { flex-wrap: wrap; justify-content: center; }
