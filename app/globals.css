@@ -243,6 +243,29 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .pagination-page-input:focus { outline: 2px solid rgba(14, 126, 109, .18); }
 .integration-notice { margin-top: 12px; padding: 10px 11px; border-left: 3px solid var(--orange); display: grid; gap: 3px; color: var(--muted); background: var(--orange-soft); font-size: 12px; }
 .integration-notice strong { color: var(--orange); }
+.report-section { padding: 20px; }
+.decision-banner { padding: 16px; border-left: 4px solid var(--brand); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: center; background: var(--brand-soft); }
+.decision-banner strong { display: block; margin-top: 4px; color: var(--brand); font-size: 25px; }
+.decision-banner p { max-width: 760px; margin-top: 5px; color: var(--muted); font-size: 12px; }
+.decision-banner-side { min-width: 130px; padding-left: 18px; border-left: 1px solid rgba(14, 126, 109, .22); display: grid; gap: 3px; text-align: right; }
+.decision-banner-side span, .decision-banner-side small { color: var(--muted); font-size: 11px; }
+.decision-banner-side b { color: var(--ink); font-size: 23px; }
+.report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.report-block { min-height: 112px; padding: 15px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.report-block h3 { font-size: 13px; }
+.report-block p { margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.65; }
+.report-block.risk { border-top: 3px solid var(--orange); padding-top: 12px; }
+.scenario-table .selected-row { background: var(--brand-soft); }
+.history-signals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.history-signals > div { padding: 12px; border-left: 3px solid var(--blue); background: var(--soft); display: grid; gap: 5px; }
+.history-signals strong { font-size: 12px; }
+.history-signals span { color: var(--muted); font-size: 12px; line-height: 1.55; }
+.condition-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.condition-list > div { min-height: 48px; padding: 10px; border: 1px solid var(--line); display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.condition-list svg { flex: 0 0 auto; margin-top: 1px; color: var(--brand); }
+.action-table { min-width: 760px; }
+.report-source { margin-top: 18px; padding-top: 13px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.report-source strong { color: var(--ink); }
 .geo-stage { min-height: 420px; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--soft); }
 .amap-stage { width: 100%; min-height: 420px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--soft); }
 .amap-building-marker, .amap-poi-marker { display: grid; place-items: center; border: 2px solid #fff; border-radius: 50%; color: #fff; box-shadow: 0 3px 10px rgba(22,39,45,.25); font-size: 12px; font-weight: 600; }
@@ -300,6 +323,7 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .main { padding: 18px; }
   .topbar { padding: 0 16px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
   .grid.two, .grid.three { grid-template-columns: 1fr; }
+  .condition-list { grid-template-columns: 1fr; }
   .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
@@ -310,6 +334,10 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .page-actions { margin-top: 14px; flex-wrap: wrap; }
   .grid.four { grid-template-columns: 1fr 1fr; gap: 10px; }
   .form-row, .decision-grid { grid-template-columns: 1fr; }
+  .report-grid, .history-signals { grid-template-columns: 1fr; }
+  .decision-banner { grid-template-columns: 1fr; gap: 14px; }
+  .decision-banner-side { padding: 12px 0 0; border-left: 0; border-top: 1px solid rgba(14, 126, 109, .22); text-align: left; }
+  .report-source { grid-template-columns: 1fr; gap: 4px; }
   .search-result { grid-template-columns: 1fr; }
   .search-result-actions { flex-direction: row; flex-wrap: wrap; }
   .pagination { flex-wrap: wrap; justify-content: center; }
