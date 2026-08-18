@@ -7,6 +7,7 @@ import AmapMap from './amap-map';
 import { filterOutExistingTenants } from '@/lib/merchant-dedup.mjs';
 import { assessRentSales, buildTenantBenchmark, rentSalesThreshold } from '@/lib/analysis-report.mjs';
 import { buildSupplementReport, parseAnalysisSupplementRows } from '@/lib/analysis-supplement.mjs';
+import { reportLines } from '@/lib/pdf-report.mjs';
 import { readXlsxRows } from '@/lib/xlsx-reader.mjs';
 import {
   Bell, BookmarkCheck, BookmarkPlus, Building2, ChartNoAxesCombined, CircleCheck, ClipboardCheck,
@@ -293,11 +294,40 @@ export default function Workbench() {
     clearTimeout(toastTimer.current);
     toastTimer.current=setTimeout(()=>setToast(''),2200);
   };
+  const renderReportImages = async report => {
+    if(document.fonts?.ready) await document.fonts.ready;
+    const lines=reportLines(report);
+    const pageLines=31;
+    const pages=[];
+    for(let index=0;index<lines.length;index+=pageLines) pages.push(lines.slice(index,index+pageLines));
+    return pages.map((currentPage,pageIndex)=>{
+      const canvas=document.createElement('canvas');
+      canvas.width=1190;
+      canvas.height=1684;
+      const context=canvas.getContext('2d');
+      context.fillStyle='#ffffff';
+      context.fillRect(0,0,canvas.width,canvas.height);
+      context.fillStyle='#15252b';
+      let y=82;
+      currentPage.forEach(line=>{
+        const size=Math.max(16,Math.round((line.size||11)*2.1));
+        context.font=`${line.size>=14?'700':'400'} ${size}px "Microsoft YaHei", "Noto Sans CJK SC", "SimSun", sans-serif`;
+        if(line.text) context.fillText(line.text,72,y);
+        y+=Math.max(28,Math.round(size*1.55));
+      });
+      context.fillStyle='#75858a';
+      context.font='18px "Microsoft YaHei", "Noto Sans CJK SC", "SimSun", sans-serif';
+      context.fillText(`第 ${pageIndex+1} / ${pages.length} 页`,72,1618);
+      return canvas.toDataURL('image/jpeg',0.92);
+    });
+  };
   const downloadAnalysisReport = async report => {
     if(reportGenerating) return;
     setReportGenerating(true);
     try {
-      const response=await fetch('/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...report,generatedAt:new Date().toLocaleString('zh-CN',{hour12:false})})});
+      const payload={...report,generatedAt:new Date().toLocaleString('zh-CN',{hour12:false})};
+      const images=await renderReportImages(payload);
+      const response=await fetch('/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,images,imageWidth:1190,imageHeight:1684})});
       if(!response.ok) {
         const data=await response.json().catch(()=>({}));
         throw new Error(data.message||'PDF 报告生成失败');

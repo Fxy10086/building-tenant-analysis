@@ -17,3 +17,10 @@ test('builds a downloadable PDF with the analysis report structure', () => {
   assert.match(text, /STSong-Light/);
   assert.ok(pdf.length > 1000);
 });
+
+test('embeds browser-rendered report pages as images for portable Chinese PDFs', () => {
+  const pdf = buildAnalysisPdf({ images: ['data:image/jpeg;base64,/9j/4AAQ'], imageWidth: 1190, imageHeight: 1684 });
+  const text = new TextDecoder().decode(pdf);
+  assert.match(text, /\/Subtype \/Image/);
+  assert.match(text, /\/Filter \/DCTDecode/);
+});
