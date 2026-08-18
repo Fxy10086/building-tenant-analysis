@@ -7,7 +7,6 @@ import AmapMap from './amap-map';
 import { filterOutExistingTenants } from '@/lib/merchant-dedup.mjs';
 import { assessRentSales, buildTenantBenchmark, rentSalesThreshold } from '@/lib/analysis-report.mjs';
 import { buildSupplementReport, parseAnalysisSupplementRows } from '@/lib/analysis-supplement.mjs';
-import { reportLines } from '@/lib/pdf-report.mjs';
 import { readXlsxRows } from '@/lib/xlsx-reader.mjs';
 import {
   Bell, BookmarkCheck, BookmarkPlus, Building2, ChartNoAxesCombined, CircleCheck, ClipboardCheck,
@@ -296,30 +295,167 @@ export default function Workbench() {
   };
   const renderReportImages = async report => {
     if(document.fonts?.ready) await document.fonts.ready;
-    const lines=reportLines(report);
-    const pageLines=31;
+    const width=1190;
+    const height=1684;
+    const margin=72;
+    const contentWidth=width-margin*2;
+    const fontFamily='"Microsoft YaHei", "Noto Sans CJK SC", "SimSun", sans-serif';
+    const colors={ink:'#15252b',muted:'#63757a',brand:'#087f6c',brandSoft:'#e8f5f1',blue:'#287aa7',blueSoft:'#e9f3f8',orange:'#c87816',orangeSoft:'#fff2dc',line:'#dbe5e3',surface:'#ffffff',canvas:'#f4f8f7'};
+    const wrap=(value,maxChars)=>{const chars=Array.from(String(value??''));const result=[];if(!chars.length)return [''];for(let index=0;index<chars.length;index+=maxChars)result.push(chars.slice(index,index+maxChars).join(''));return result;};
     const pages=[];
-    for(let index=0;index<lines.length;index+=pageLines) pages.push(lines.slice(index,index+pageLines));
-    return pages.map((currentPage,pageIndex)=>{
-      const canvas=document.createElement('canvas');
-      canvas.width=1190;
-      canvas.height=1684;
-      const context=canvas.getContext('2d');
-      context.fillStyle='#ffffff';
-      context.fillRect(0,0,canvas.width,canvas.height);
-      context.fillStyle='#15252b';
-      let y=82;
-      currentPage.forEach(line=>{
-        const size=Math.max(16,Math.round((line.size||11)*2.1));
-        context.font=`${line.size>=14?'700':'400'} ${size}px "Microsoft YaHei", "Noto Sans CJK SC", "SimSun", sans-serif`;
-        if(line.text) context.fillText(line.text,72,y);
-        y+=Math.max(28,Math.round(size*1.55));
+    let canvas;
+    let context;
+    let pageNumber=0;
+    let y=0;
+    const setFont=(size,weight='400',color=colors.ink)=>{context.font=`${weight} ${size}px ${fontFamily}`;context.fillStyle=color;};
+    const roundedRect=(x,yPos,w,h,r=12)=>{context.beginPath();context.roundRect(x,yPos,w,h,r);};
+    const drawPageHeader=()=>{
+      context.fillStyle=colors.canvas;
+      context.fillRect(0,0,width,height);
+      if(pageNumber===1){
+        context.fillStyle=colors.brand;
+        context.fillRect(0,0,width,224);
+        setFont(42,'700','#ffffff');
+        wrap(report.title||'招商分析报告',24).slice(0,2).forEach((line,index)=>context.fillText(line,margin,78+index*53));
+        setFont(19,'400','#d9f2ec');
+        context.fillText('楼宇招商分析台 · 中关村融科资讯中心',margin,184);
+        y=264;
+      } else {
+        context.fillStyle=colors.brand;
+        context.fillRect(0,0,width,88);
+        setFont(25,'700','#ffffff');
+        context.fillText(report.title||'招商分析报告',margin,56);
+        y=128;
+      }
+    };
+    const startPage=()=>{
+      pageNumber+=1;
+      canvas=document.createElement('canvas');
+      canvas.width=width;
+      canvas.height=height;
+      context=canvas.getContext('2d');
+      drawPageHeader();
+    };
+    const finishPage=()=>{
+      context.strokeStyle=colors.line;
+      context.lineWidth=2;
+      context.beginPath();
+      context.moveTo(margin,height-82);
+      context.lineTo(width-margin,height-82);
+      context.stroke();
+      setFont(17,'400',colors.muted);
+      context.fillText('招商分析报告 · 仅供招商决策参考',margin,height-42);
+      context.textAlign='right';
+      context.fillText(`第 ${pageNumber} 页`,width-margin,height-42);
+      context.textAlign='left';
+      pages.push(canvas.toDataURL('image/jpeg',0.92));
+    };
+    const ensureSpace=needed=>{if(y+needed>height-112){finishPage();startPage();}};
+    const drawText=(value,x,w,size=22,weight='400',color=colors.muted,lineGap=12)=>{
+      const lines=wrap(value,Math.max(10,Math.floor(w/(size*.96))));
+      setFont(size,weight,color);
+      lines.forEach(line=>{ensureSpace(size+lineGap);context.fillText(line,x,y);y+=size+lineGap;});
+      return lines.length*(size+lineGap);
+    };
+    const drawCard=(x,yPos,w,h,fill=colors.surface)=>{context.fillStyle=fill;context.strokeStyle=colors.line;context.lineWidth=2;roundedRect(x,yPos,w,h,12);context.fill();context.stroke();};
+    const drawSectionTitle=title=>{
+      ensureSpace(58);
+      context.fillStyle=colors.brand;
+      roundedRect(margin,y,10,34,5);
+      context.fill();
+      setFont(27,'700',colors.ink);
+      context.fillText(title,margin+25,y+28);
+      y+=58;
+    };
+    startPage();
+    drawCard(margin,y,contentWidth,218);
+    setFont(20,'700',colors.muted);
+    context.fillText('招商结论',margin+28,y+40);
+    const verdictColor=String(report.verdict||'').includes('不建议')?colors.orange:colors.brand;
+    setFont(34,'700',verdictColor);
+    context.fillText(report.verdict||'待补充',margin+28,y+86);
+    if(report.confidence!=null){setFont(19,'400',colors.muted);context.fillText(`数据可信度 ${report.confidence}%`,margin+28,y+126);}
+    if(report.summary){
+      setFont(21,'400',colors.muted);
+      wrap(report.summary,38).slice(0,3).forEach((line,index)=>context.fillText(line,margin+28,y+158+index*29));
+    }
+    if(Number.isFinite(Number(report.score))){
+      const score=Number(report.score);
+      const cx=width-margin-120;
+      const cy=y+108;
+      context.lineWidth=18;
+      context.strokeStyle=colors.line;
+      context.beginPath();context.arc(cx,cy,65,0,Math.PI*2);context.stroke();
+      context.strokeStyle=verdictColor;
+      context.beginPath();context.arc(cx,cy,65,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,Math.min(100,score))/100);context.stroke();
+      context.textAlign='center';
+      setFont(36,'700',colors.ink);context.fillText(String(score),cx,cy+12);
+      setFont(17,'400',colors.muted);context.fillText('综合得分',cx,cy+40);
+      context.textAlign='left';
+    }
+    y+=242;
+    if(Array.isArray(report.facts)&&report.facts.length){
+      drawSectionTitle('关键指标');
+      for(let index=0;index<report.facts.length;index+=2){
+        const row=report.facts.slice(index,index+2);
+        const cardHeight=86;
+        ensureSpace(cardHeight+14);
+        row.forEach((fact,column)=>{
+          const x=margin+column*(contentWidth/2+14);
+          const cardWidth=contentWidth/2-7;
+          drawCard(x,y,cardWidth,cardHeight,colors.surface);
+          setFont(18,'400',colors.muted);context.fillText(String(fact[0]||''),x+20,y+31);
+          setFont(25,'700',colors.ink);context.fillText(wrap(fact[1],22)[0],x+20,y+66);
+        });
+        y+=cardHeight+14;
+      }
+      y+=8;
+    }
+    (report.sections||[]).forEach((section,sectionIndex)=>{
+      drawSectionTitle(section.title||`分析模块 ${sectionIndex+1}`);
+      const items=Array.isArray(section.items)?section.items:[];
+      if(section.title==='财务三情景'){
+        const tableX=margin;
+        const tableW=contentWidth;
+        const labelW=150;
+        ensureSpace(52+items.length*64);
+        context.fillStyle=colors.brandSoft;context.fillRect(tableX,y,tableW,48);
+        setFont(18,'700',colors.brand);context.fillText('情景',tableX+20,y+31);context.fillText('测算结果',tableX+labelW+20,y+31);
+        y+=48;
+        items.forEach((item,rowIndex)=>{
+          const rowHeight=64;
+          context.fillStyle=rowIndex%2===0?colors.surface:'#f8fbfa';context.fillRect(tableX,y,tableW,rowHeight);
+          context.strokeStyle=colors.line;context.strokeRect(tableX,y,tableW,rowHeight);
+          const parts=String(item).split('：');
+          setFont(20,'700',rowIndex===1?colors.brand:colors.ink);context.fillText(parts[0]||'',tableX+20,y+39);
+          setFont(18,'400',colors.muted);
+          wrap(parts.slice(1).join('：'),45).slice(0,2).forEach((line,lineIndex)=>context.fillText(line,tableX+labelW+20,y+28+lineIndex*22));
+          y+=rowHeight;
+        });
+        y+=20;
+        return;
+      }
+      items.forEach((item,itemIndex)=>{
+        const itemLines=wrap(`  ${item}`,46);
+        const itemHeight=Math.max(58,itemLines.length*29+24);
+        ensureSpace(itemHeight+10);
+        drawCard(margin,y,contentWidth,itemHeight,colors.surface);
+        context.fillStyle=sectionIndex%2===0?colors.brand:colors.blue;
+        context.beginPath();context.arc(margin+28,y+29,15,0,Math.PI*2);context.fill();
+        context.textAlign='center';setFont(16,'700','#ffffff');context.fillText(String(itemIndex+1),margin+28,y+35);context.textAlign='left';
+        setFont(20,'400',colors.ink);
+        itemLines.forEach((line,lineIndex)=>context.fillText(line,margin+58,y+31+lineIndex*29));
+        y+=itemHeight+10;
       });
-      context.fillStyle='#75858a';
-      context.font='18px "Microsoft YaHei", "Noto Sans CJK SC", "SimSun", sans-serif';
-      context.fillText(`第 ${pageIndex+1} / ${pages.length} 页`,72,1618);
-      return canvas.toDataURL('image/jpeg',0.92);
+      y+=10;
     });
+    ensureSpace(106);
+    drawCard(margin,y,contentWidth,92,colors.blueSoft);
+    setFont(18,'700',colors.blue);context.fillText('数据说明',margin+22,y+30);
+    setFont(17,'400',colors.muted);
+    wrap(report.source||'本报告由楼宇招商分析台根据当前页面数据生成。',54).slice(0,2).forEach((line,index)=>context.fillText(line,margin+22,y+58+index*24));
+    finishPage();
+    return pages;
   };
   const downloadAnalysisReport = async report => {
     if(reportGenerating) return;
