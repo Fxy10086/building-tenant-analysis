@@ -174,6 +174,7 @@ export default function Workbench() {
   const [analysisUploadState,setAnalysisUploadState] = useState('idle');
   const [analysisUploadError,setAnalysisUploadError] = useState('');
   const [supplementTarget,setSupplementTarget] = useState(null);
+  const [reportGenerating,setReportGenerating] = useState(false);
 
   useEffect(()=>{
     try {
@@ -292,6 +293,32 @@ export default function Workbench() {
     clearTimeout(toastTimer.current);
     toastTimer.current=setTimeout(()=>setToast(''),2200);
   };
+  const downloadAnalysisReport = async report => {
+    if(reportGenerating) return;
+    setReportGenerating(true);
+    try {
+      const response=await fetch('/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...report,generatedAt:new Date().toLocaleString('zh-CN',{hour12:false})})});
+      if(!response.ok) {
+        const data=await response.json().catch(()=>({}));
+        throw new Error(data.message||'PDF 报告生成失败');
+      }
+      const blob=await response.blob();
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement('a');
+      link.href=url;
+      link.download=`${String(report.fileName||report.title||'招商分析报告').replace(/[\\/:*?"<>|]/g,'_')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      notify('PDF 招商分析报告已下载');
+    } catch(error) {
+      notify(error.message||'PDF 报告生成失败');
+    } finally {
+      setReportGenerating(false);
+    }
+  };
+  const reportButton = report => <button className="btn primary" disabled={reportGenerating} onClick={()=>downloadAnalysisReport(report)}><FileDown size={16}/>{reportGenerating?'生成中…':'生成 PDF 报告'}</button>;
   const selectCandidate = key => {
     setCandidateKey(key);
     setAnalysisPoiId(null);
@@ -391,7 +418,8 @@ export default function Workbench() {
       const activeScenario=uploadedReport.scenarios.find(item=>item.key===scenario)||uploadedReport.base;
       const scenarioLabels={low:'保守',base:'基准',high:'乐观'};
       const engineering=[['给排水',analysisSupplement.water],['排烟',analysisSupplement.exhaust],['燃气',analysisSupplement.gas],['电力',Number.isFinite(analysisSupplement.power)?`${analysisSupplement.power}kW`:null],['承重',Number.isFinite(analysisSupplement.loadBearing)?`${analysisSupplement.loadBearing}kg/㎡`:null]].filter(([,value])=>value);
-      return <>{header(<div className="page-actions"><span className="badge">Excel 已校验</span><button className="btn" onClick={clearAnalysisSupplement}><Trash2 size={15}/>移除资料</button></div>)}
+      const uploadedPdfReport={fileName:`${analysisSupplement.name}-招商分析报告`,title:`${analysisSupplement.name} · 招商分析报告`,verdict:uploadedReport.verdict,score:uploadedReport.score,confidence:uploadedReport.confidence,summary:`基准月销售 ${money(analysisSupplement.revenueBase)} 万元，预计经营利润 ${money(uploadedReport.base.profit)} 万元，租售比 ${uploadedReport.base.rentSales.toFixed(1)}%。结论同时考虑楼内${analysisSupplement.subtype}供给、写字楼客流适配和品牌补充资料。`,facts:[['业态',`${analysisSupplement.group} · ${analysisSupplement.subtype}`],['所需面积',`${money(analysisSupplement.area)}㎡`],['报价月租金',`${money(analysisSupplement.rent)} 万元/月`],['盈亏平衡月销售',`${money(uploadedReport.breakeven)} 万元`],['数据完整度',`${analysisSupplement.completeness}%`],['楼内供给',`${uploadedBenchmark.subtypeCount} 家${analysisSupplement.subtype} · ${uploadedBenchmark.supply}`]],sections:[{title:'财务三情景',items:uploadedReport.scenarios.map(item=>`${scenarioLabels[item.key]}：月销售 ${money(item.revenue)} 万，经营利润 ${money(item.profit)} 万，租售比 ${item.rentSales.toFixed(1)}%，回收期 ${item.payback==null?'无法回收':`${money(item.payback)} 个月`}，${item.assessment.level}`)},{title:'经营与工程适配',items:[`工作日销售占比 ${Number.isFinite(analysisSupplement.weekdayShare)?`${analysisSupplement.weekdayShare}%`:'待补充'}，自然客流依赖 ${analysisSupplement.trafficDependency||'待补充'}`,engineering.length?engineering.map(([label,value])=>`${label}${value}`).join('；'):'工程条件待补充']},{title:'风险与招商条件',items:[...uploadedReport.risks,...uploadedReport.conditions]},{title:'审批行动',items:['核验 Excel 经营数据与品牌门店凭证','匹配铺位并完成工程踏勘','按租售比阈值谈判租金','提交最终招商审批']}],source:`候选经营与工程资料来自 Excel；楼内商户与销售来自飞书只读同步（${dataPeriod}）；周边位置由高德地图提供。`};
+      return <>{header(<><span className="badge">Excel 已校验</span>{reportButton(uploadedPdfReport)}<button className="btn" onClick={clearAnalysisSupplement}><Trash2 size={15}/>移除资料</button></>)}
         <div className="analysis-grid"><div className="grid"><section className="panel"><div className="panel-head"><div><h2>分析资料</h2><p className="page-subtitle">{analysisSupplement.fileName}</p></div><span className="badge blue">截止 {analysisSupplement.asOfDate}</span></div><div className="form-row"><label className="field"><span className="field-label">候选商户</span><input className="form-control" value={analysisSupplement.name} readOnly/></label><label className="field"><span className="field-label">业态</span><input className="form-control" value={`${analysisSupplement.group} · ${analysisSupplement.subtype}`} readOnly/></label><label className="field"><span className="field-label">所需面积</span><input className="form-control" value={`${money(analysisSupplement.area)}㎡`} readOnly/></label><label className="field"><span className="field-label">品牌联系人</span><input className="form-control" value={analysisSupplement.contact} readOnly/></label></div></section>
           <section className="panel"><div className="panel-head"><h2>楼内真实基准</h2><span className="panel-note">{benchmarkStatus}</span></div>{feishuDataState==='live'?<div className="grid two"><Metric label="在营商户" value={`${uploadedBenchmark.totalCount} 家`} note={`${analysisSupplement.group} ${uploadedBenchmark.categoryCount} 家`}/><Metric label={analysisSupplement.subtype} value={`${uploadedBenchmark.subtypeCount} 家`} note={uploadedBenchmark.supply}/><Metric label="同业销售中位数" value={uploadedBenchmark.medianSales==null?'样本不足':`${money(uploadedBenchmark.medianSales)} 万`} note={dataPeriod}/><Metric label="同业平均坪效" value={uploadedBenchmark.averageEfficiency==null?'样本不足':`${money(uploadedBenchmark.averageEfficiency)} 元/㎡`} note={`${uploadedBenchmark.efficiencyCount} 家可计算`}/></div>:<div className="integration-notice"><strong>{benchmarkStatus}</strong><span>{feishuDataError||'飞书加载完成后自动补入供需与分流判断。'}</span></div>}</section></div>
           <section className="panel"><div className="result-head"><div className="score-wrap"><div className="score-ring" style={{'--score':uploadedReport.score}}><span>{uploadedReport.score}</span></div><div><h2>{analysisSupplement.name} · 自动分析结论</h2><div className="badge-row"><span className={`badge ${uploadedReport.verdict.includes('不建议')?'warn':''}`}><CircleCheck size={14}/>{uploadedReport.verdict}</span><span className="badge blue">可信度 {uploadedReport.confidence}%</span><span className="badge blue">完整字段 {analysisSupplement.completeness}%</span></div><p className="summary">基准月销售 {money(analysisSupplement.revenueBase)} 万元，预计经营利润 {money(uploadedReport.base.profit)} 万元，租售比 {uploadedReport.base.rentSales.toFixed(1)}%。结论同时考虑楼内{analysisSupplement.subtype}供给、写字楼客流适配和品牌补充资料。</p></div></div><span className="panel-note">Excel 真实补充资料</span></div>
@@ -405,7 +433,9 @@ export default function Workbench() {
           <div className="section"><div className="section-title"><h3>审批行动清单</h3><span className="panel-note">数据截止 {analysisSupplement.asOfDate}</span></div><div className="table-wrap"><table className="action-table"><thead><tr><th>顺序</th><th>动作</th><th>负责人</th><th>截止时间</th><th>审批输出</th></tr></thead><tbody><tr><td>1</td><td>核验 Excel 经营数据与品牌门店凭证</td><td>{analysisSupplement.contact}</td><td>2 个工作日内</td><td>确认销售、毛利和成本口径</td></tr><tr><td>2</td><td>匹配铺位并完成工程踏勘</td><td>招商与工程</td><td>数据核验后 2 日</td><td>确认面积、改造条件和预算</td></tr><tr><td>3</td><td>按租售比阈值谈判租金</td><td>招商负责人</td><td>踏勘通过后 5 日</td><td>形成租金、免租及保护条款</td></tr><tr><td>4</td><td>提交最终招商审批</td><td>审批负责人</td><td>谈判完成后 1 日</td><td>附财务、分流、工程和风险结论</td></tr></tbody></table></div></div>
           <div className="report-source"><strong>数据来源与安全</strong><span>候选经营与工程资料来自本次 Excel 文件；楼内商户与销售来自飞书只读同步（{dataPeriod}）；周边位置由高德地图提供。Excel 仅在当前浏览器解析，不上传服务器、不修改飞书字段。</span></div></section></>;
     }
-    if(selectedPoi) return <>{header(<button className="btn" onClick={()=>setDrawer('history')}><History size={16}/>分析历史</button>)}
+    if(selectedPoi) {
+      const poiPdfReport={fileName:`${selectedPoi.merchant}-招商初审报告`,title:`${selectedPoi.merchant} · 招商初审报告`,verdict:'资料准备中',summary:`位置与业态信息已具备，可进入品牌接洽；因缺少租金、营收、成本、面积和工程条件，当前不能判断盈利能力。`,facts:[['业态',`${selectedPoi.group} · ${selectedPoi.subtype||selectedPoi.group}`],['高德评分',selectedPoi.rating||'暂无'],['距写字楼',formatDistance(selectedPoi.distance)],['楼内同细分供给',`${poiBenchmark.subtypeCount} 家 · ${poiBenchmark.supply}`]],sections:[{title:'写字楼适配',items:['优先核验工作日客流、午间或晚间高峰经营能力','确认品牌是否依赖购物中心周末自然客流']},{title:'风险与决策缺口',items:['尚不能计算月销售、租售比、盈亏平衡、回收期和同业分流','补齐品牌经营样本、所需面积、报价租金、毛利和固定成本']},{title:'下一步招商动作',items:['联系品牌拓展负责人并获取品牌资料','补充成熟门店经营数据','匹配铺位并完成工程踏勘','提交招商审批']}],source:'楼内业态与销售来自飞书多维表格只读同步；候选位置由高德地图提供；经营与租赁参数尚未提供。'};
+      return <>{header(<><>{reportButton(poiPdfReport)}</><button className="btn" onClick={()=>setDrawer('history')}><History size={16}/>分析历史</button></>)}
       <div className="analysis-grid"><div className="grid"><section className="panel"><div className="panel-head"><div><h2>选择分析对象</h2><p className="page-subtitle">显示候选库中的全部商户</p></div><Link href="/shortlist" className="panel-note">管理候选库</Link></div>
         <label className="field" style={{marginTop:0}}><span className="field-label">搜索候选商户</span><span className="input-icon"><Search size={16}/><input className="form-control" value={analysisSearch} onChange={e=>setAnalysisSearch(e.target.value)} placeholder="输入商户名称"/></span></label>
         <div className="chips">{availableCandidates.map(key=><button key={key} className="chip" onClick={()=>selectCandidate(key)}>{candidates[key].name}</button>)}{availablePoiCandidates.map(item=><button key={item.poiId} className={`chip ${item.poiId===analysisPoiId?'active':''}`} onClick={()=>selectPoiCandidate(item.poiId)}>{item.merchant}</button>)}{!availableCandidates.length&&!availablePoiCandidates.length&&<span className="panel-note">候选库中没有匹配商户</span>}</div>
@@ -420,7 +450,9 @@ export default function Workbench() {
         <div className="report-grid section"><div className="report-block"><h3>写字楼适配</h3><p>优先核验其工作日客流、午间或晚间高峰经营能力，以及是否依赖购物中心周末自然客流。</p></div><div className="report-block"><h3>竞争与分流</h3><p>高德已确认候选门店位置；周边同类数量需在商户搜索页按 2、5、10 公里半径复核，楼内同业分流待经营资料齐备后测算。</p></div><div className="report-block risk"><h3>风险预警</h3><p>在缺少财务与工程资料的情况下签署租赁条件，可能高估品牌承租能力和楼宇补位价值。</p></div><div className="report-block"><h3>审批前置条件</h3><p>品牌联系人、面积需求、租金承受、成熟门店月销售、毛利、固定成本、给排水及消防要求。</p></div></div>
         <div className="section"><div className="section-title"><h3>下一步招商动作</h3><span className="panel-note">负责人：{selectedPoi.owner}</span></div><div className="table-wrap"><table className="action-table"><thead><tr><th>顺序</th><th>动作</th><th>交付结果</th><th>截止时间</th></tr></thead><tbody><tr><td>1</td><td>联系品牌拓展负责人</td><td>品牌资料及开店条件</td><td>3 个工作日内</td></tr><tr><td>2</td><td>补充成熟门店经营数据</td><td>可验证的营收与成本口径</td><td>资料接收后 2 日</td></tr><tr><td>3</td><td>匹配铺位并踏勘</td><td>面积、工程和租金方案</td><td>经营初审通过后</td></tr><tr><td>4</td><td>提交招商审批</td><td>结论、风险和谈判底线</td><td>完整测算后 1 日</td></tr></tbody></table></div></div>
         <div className="report-source"><strong>数据来源</strong><span>楼内业态与销售：飞书多维表格（只读）；候选位置：高德地图；经营与租赁参数：尚未提供。系统不会修改飞书字段。</span></div></section></>;
-    return <>{header(<button className="btn" onClick={()=>setDrawer('history')}><History size={16}/>分析历史</button>)}
+    }
+    const candidatePdfReport={fileName:`${p.name}-招商分析报告`,title:`${p.name} · 完整招商决策报告`,verdict:p.verdict,score:p.score,confidence:bc.confidence,summary:p.summary,facts:[['业态',`${p.group} · ${p.subtype}`],['基准月销售',`${money(bc.revenue.base)} 万元`],['建议租金区间',bc.rentBand],['盈亏平衡营收',`${bc.breakeven} 万元/月`],['预计分流',`约 ${bc.cannibalization}%`],['楼内供给',`${benchmark.subtypeCount} 家${p.subtype} · ${benchmark.supply}`]],sections:[{title:'财务三情景',items:scenarioRows.map(row=>{const assessment=assessRentSales(p.group,row.rentSales);return `${row.label}：月销售 ${money(row.revenue)} 万，经营利润 ${money(row.profit)} 万，租售比 ${row.rentSales.toFixed(1)}%，回收期 ${row.payback} 个月，${assessment.level}`})},{title:'楼内供需与写字楼适配',items:[feishuDataState==='live'?`楼内在营 ${benchmark.totalCount} 家，其中${p.group} ${benchmark.categoryCount} 家、${p.subtype} ${benchmark.subtypeCount} 家，判断为${benchmark.supply}`:'飞书真实数据正在加载，暂不引用模拟商户数量',`适配度 ${profile.officeFit}；主要消费时段 ${profile.period}；自然客流依赖 ${profile.trafficDependency}`,`工程条件：${profile.engineering}`]},{title:'竞争、风险与招商条件',items:[`竞争与分流：模型预计楼内同业分流约 ${bc.cannibalization}%`,p.riskText,...profile.conditions]},{title:'审批行动',items:['核验品牌经营数据与开店模型','目标铺位工程踏勘','租金及保护条款谈判','提交招商审批']}],source:`楼内商户、面积和销售来自飞书多维表格只读同步（${dataPeriod}）；候选财务参数为招商测算样本，必须经品牌尽调确认；周边竞争需由高德实时搜索复核。`};
+    return <>{header(<><>{reportButton(candidatePdfReport)}</><button className="btn" onClick={()=>setDrawer('history')}><History size={16}/>分析历史</button></>)}
       <div className="analysis-grid"><div className="grid"><section className="panel"><div className="panel-head"><div><h2>选择分析对象</h2><p className="page-subtitle">仅显示已加入候选商户库的品牌</p></div><Link href="/shortlist" className="panel-note">管理候选库</Link></div>
         <label className="field" style={{marginTop:0}}><span className="field-label">搜索候选品牌</span><span className="input-icon"><Search size={16}/><input className="form-control" value={analysisSearch} onChange={e=>setAnalysisSearch(e.target.value)} placeholder="输入品牌名称"/></span></label>
         <div className="chips">{availableCandidates.map(key=><button key={key} className={`chip ${key===candidateKey&&!analysisPoiId?'active':''}`} onClick={()=>selectCandidate(key)}>{candidates[key].name}</button>)}{availablePoiCandidates.map(item=><button key={item.poiId} className="chip" onClick={()=>selectPoiCandidate(item.poiId)}>{item.merchant}</button>)}{!availableCandidates.length&&!availablePoiCandidates.length&&<span className="panel-note">候选库中没有匹配商户</span>}</div>
@@ -479,7 +511,7 @@ export default function Workbench() {
 
   function ComparePage(){
     const liveMap=amapMode==='live'&&amapCenter;
-    return <>{header(<><span className={`badge ${liveMap?'':'blue'}`}>{liveMap?'高德实时数据':amapMode==='connecting'?'高德连接中':'高德暂不可用'}</span><button className="btn" onClick={()=>notify('候选对比报告已生成')}><FileDown size={16}/>生成报告</button></>)}
+    return <>{header(<span className={`badge ${liveMap?'':'blue'}`}>{liveMap?'高德实时数据':amapMode==='connecting'?'高德连接中':'高德暂不可用'}</span>)}
       <div className="merchant-locator"><section className="panel"><div className="panel-head"><div><h2>搜索周边商户</h2><p className="page-subtitle">可收藏品牌，也可选择门店直接比较</p></div><span className="panel-note">最多对比 3 家</span></div>
         <label className="field" style={{marginTop:0}}><span className="field-label">关键词</span><span className="input-icon"><Search size={16}/><input id="compare-search" className="form-control" value={compareSearch} onChange={e=>setCompareSearch(e.target.value)} placeholder="例如：M Stand、金融中心店"/></span></label>
         <div className="form-row three-fields"><label className="field"><span className="field-label">业态大类</span><select className="form-select" value={compareGroup} onChange={e=>{setCompareGroup(e.target.value);setCompareSubtype('全部');}}>{CATEGORY_GROUPS.map(v=><option key={v}>{v}</option>)}</select></label><label className="field"><span className="field-label">细分业态</span><select className="form-select" value={compareSubtype} onChange={e=>setCompareSubtype(e.target.value)}>{SUBTYPES_BY_GROUP[compareGroup].map(v=><option key={v}>{v}</option>)}</select></label><label className="field"><span className="field-label">搜索半径</span><select className="form-select" value={compareRadius} onChange={e=>setCompareRadius(Number(e.target.value))}><option value="500">500 米</option><option value="1000">1 公里</option><option value="2000">2 公里</option><option value="5000">5 公里</option><option value="10000">10 公里</option></select></label></div>
