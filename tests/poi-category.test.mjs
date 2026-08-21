@@ -17,3 +17,8 @@ test('maps beverage, fast food, retail and service aliases', () => {
 test('uses Amap type codes as a fallback', () => {
   assert.deepEqual(inferPoiCategory({ name: '某个场所', typecode: '080000' }), { group: '休闲娱乐', subtype: '休闲娱乐' });
 });
+
+test('applies audited brand overrides before generic labels and type codes', () => {
+  assert.deepEqual(inferPoiCategory({ name: '鲜芋仙（融科店）', type: '餐饮服务;甜品店', typecode: '050000' }), { group: '餐饮', subtype: '饮品' });
+  assert.deepEqual(inferPoiCategory({ name: '味多美（中关村店）', type: '生活服务;服务中心', typecode: '070000' }), { group: '餐饮', subtype: '烘焙' });
+});
