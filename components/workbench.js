@@ -7,6 +7,7 @@ import AmapMap from './amap-map';
 import { filterOutExistingTenants } from '@/lib/merchant-dedup.mjs';
 import { assessRentSales, buildTenantBenchmark, rentSalesThreshold } from '@/lib/analysis-report.mjs';
 import { buildSupplementReport, parseAnalysisSupplementRows } from '@/lib/analysis-supplement.mjs';
+import { inferPoiCategory } from '@/lib/poi-category.mjs';
 import { readXlsxRows } from '@/lib/xlsx-reader.mjs';
 import {
   Bell, BookmarkCheck, BookmarkPlus, Building2, ChartNoAxesCombined, CircleCheck, ClipboardCheck,
@@ -105,17 +106,6 @@ const groupClass = group => group==='服务配套'?'service':group==='零售'?'r
 const BUILDING_ADDRESS = process.env.NEXT_PUBLIC_BUILDING_ADDRESS || '北京市海淀区中关村融科资讯中心';
 const hasAmapConfig = Boolean(process.env.NEXT_PUBLIC_AMAP_KEY && process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE);
 const amapTypes = {全部:'050000|060000|070000|080000',餐饮:'050000',服务配套:'070000',零售:'060000',休闲娱乐:'080000'};
-const inferPoiCategory = poi => {
-  const text=`${poi.name}${poi.type}`;
-  if(/^08/.test(poi.typecode)||/健身|运动|瑜伽|游泳|影院|娱乐|KTV|台球/.test(text)) return {group:'休闲娱乐',subtype:'休闲娱乐'};
-  if(/^07/.test(poi.typecode)||/美容|美发|洗衣|维修|摄影|服务/.test(text)) return {group:'服务配套',subtype:'服务配套'};
-  if(/^06/.test(poi.typecode)||/商店|超市|便利店|零售|百货/.test(text)) return {group:'零售',subtype:'零售'};
-  if(/面包|烘焙|蛋糕|西点/.test(text)) return {group:'餐饮',subtype:'烘焙'};
-  if(/咖啡|茶饮|饮品|甜品|奶茶|果汁/.test(text)) return {group:'餐饮',subtype:'饮品'};
-  if(/快餐|小吃|简餐|面馆|米粉|盖饭|汉堡|披萨/.test(text)) return {group:'餐饮',subtype:'快餐'};
-  if(/商务餐|宴请|会所餐厅/.test(text)) return {group:'餐饮',subtype:'商务餐'};
-  return {group:'餐饮',subtype:'正餐'};
-};
 const formatDistance = meters => meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${meters}m`;
 const migrateSavedCategory = item => {
   if(item.group==='饮品') return {...item,group:'餐饮',subtype:item.subtype||'饮品'};
